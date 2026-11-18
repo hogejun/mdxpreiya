@@ -5009,8 +5009,84 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (s) specStart(); else specStop();
       }
 
+      /* ---------------- LZX expansion ----------------
+       * Mamiya LZX self-expanding MDX/PDX files are expanded
+       * transparently at load time (see loadSong). The format was
+       * determined from the 68000 decompression stub embedded in
+       * real LZX 0.31 files. */
+      function isLzxBytes(b) {
+        return !!b && b.length >= 0x7C &&
+          b[0] === 0x60 && b[1] === 0x26 && b[2] === 0x60 && b[3] === 0x32 &&
+          b[4] === 0x4C && b[5] === 0x5A && b[6] === 0x58 && b[7] === 0x20; /* "LZX " */
+      }
+
+      function expandLzx(src) {
+        const origSize = ((src[0x12] << 24) | (src[0x13] << 16) | (src[0x14] << 8) | src[0x15]) >>> 0;
+        if (origSize === 0 || origSize > 64 * 1024 * 1024) throw new Error('LZX: bad size');
+        const out = new Uint8Array(origSize);
+        let sp = 0x7A, dp = 0, flag = src[sp++], bits = 8;
+        function getBit() {
+          bits--;
+          if (bits < 0) {
+            if (sp >= src.length) throw new Error('LZX: src overrun');
+            flag = src[sp++]; bits = 7;
+          }
+          const carry = (flag & 0x80) !== 0;
+          flag = (flag << 1) & 0xFF;
+          return carry;
+        }
+        while (true) {
+          if (getBit()) {
+            if (sp >= src.length || dp >= origSize) throw new Error('LZX: overrun');
+            out[dp++] = src[sp++];
+            continue;
+          }
+          let count, dist;
+          if (getBit()) {
+            if (sp + 1 >= src.length) throw new Error('LZX: src overrun');
+            const b1 = src[sp++], b2 = src[sp++];
+            dist = 8192 - (((b1 << 5) | (b2 >> 3)) & 0x1FFF);
+            const lc = b2 & 7;
+            if (lc !== 0) count = lc + 2;
+            else {
+              if (sp >= src.length) throw new Error('LZX: src overrun');
+              const lb = src[sp++];
+              if (lb === 0) break;
+              count = lb + 1;
+            }
+          } else {
+            let v = 0;
+            v = (v << 1) | (getBit() ? 1 : 0);
+            v = (v << 1) | (getBit() ? 1 : 0);
+            count = v + 2;
+            if (sp >= src.length) throw new Error('LZX: src overrun');
+            dist = 256 - src[sp++];
+          }
+          let s = dp - dist;
+          if (s < 0) throw new Error('LZX: bad dist');
+          for (let i = 0; i < count; i++) {
+            if (dp >= origSize) throw new Error('LZX: dst overrun');
+            out[dp++] = out[s++];
+          }
+        }
+        return out;
+      }
+
+      function maybeExpandLzx(bytes) {
+        if (!isLzxBytes(bytes)) return bytes;
+        return expandLzx(bytes);
+      }
+
       /* ---------------- song loading ---------------- */
       async function loadSong(mdxBytes, name, source, autoplay, pdxOverride) {
+        /* An LZX-compressed MDX is expanded before parsing; if the
+         * expansion fails the load aborts here so garbage data
+         * never reaches the engine. */
+        let lzxExpanded = false;
+        try {
+          if (isLzxBytes(mdxBytes)) lzxExpanded = true;
+          mdxBytes = maybeExpandLzx(mdxBytes);
+        } catch (e) { setStatus('LZX展開に失敗しました: ' + e.message); return; }
         /* A manually chosen song cancels continuous random mode;
          * random picks load with source 'catalog' and keep it. */
         if (source !== 'catalog' && window.__mdxRandomOff) window.__mdxRandomOff();
@@ -5022,12 +5098,22 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         closeAnalysisPanel(); /* the analysis panel closes on every song load too */
         emptyFlags = computeEmptyTracks(info);
         const pdx = pdxOverride !== undefined ? pdxOverride : resolvePdxFor(info, source);
+        /* An LZX-compressed PDX is expanded the same way, whichever
+         * route supplied it (override, pool or embedded). */
+        let pdxBytes = pdx ? pdx.bytes : null;
+        if (pdxBytes) {
+          try {
+            if (isLzxBytes(pdxBytes)) lzxExpanded = true;
+            pdxBytes = maybeExpandLzx(pdxBytes);
+          } catch (e) { setStatus('LZX展開に失敗しました: ' + e.message); return; }
+        }
         cur = {
           name, title: info.title, mdx: mdxBytes, pdxName: info.pdxName,
-          pdxBytes: pdx ? pdx.bytes : null, pdxLabel: pdx ? pdx.label : '',
+          pdxBytes: pdxBytes, pdxLabel: pdx ? pdx.label : '',
           pdxMismatch: pdx ? pdx.mismatch : false, source
         };
         describeSong();
+        if (lzxExpanded) els.meta.textContent += ' ／ LZX圧縮ファイルを展開しました';
         document.querySelectorAll('.song').forEach(el => el.classList.toggle('playing', el.dataset && el.dataset.file === name));
         const be = await ensureAudio();
         if (!be) return;
