@@ -100,7 +100,7 @@
       .warnline.show { display: block; }
       /* Check display (debug): NOW PLAYING meta + PDX warning are hidden
        * unless the player panel carries .check-on, which the UI script
-       * adds only when the URL carries ?debug=1 (or true/on). Hiding is
+       * adds only in the development configuration. Hiding is
        * done via the common parent so it never conflicts with the
        * existing textContent / className logic for those elements. */
       #playerPanel:not(.check-on) .now-meta,
@@ -635,30 +635,12 @@
           <p class="rm" id="randMeta"></p>
         </div>
         <div id="randStatus" role="status"></div>
-        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②「ランダム再生」で、読み込んだフォルダ内（サブフォルダ含む）の MDX から無作為に1曲を選び、参照 PDX があれば同じフォルダから自動で読み込んで再生します。「ランダム再生」は連続モードの切り替えで、ON の間は曲が終わるたびに次のランダム曲を引きます（候補が2曲以上あるときは、直前と同じ曲は連続で引きません）。「次のランダム」でもう1曲引けます。全曲カタログからの抽選はデバッグ用で、URL パラメータ ?debug=1 のときだけ有効です。Mac のデスクトップ前提です。</p>
+        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②「ランダム再生」で、読み込んだフォルダ内（サブフォルダ含む）の MDX から無作為に1曲を選び、参照 PDX があれば同じフォルダから自動で読み込んで再生します。「ランダム再生」は連続モードの切り替えで、ON の間は曲が終わるたびに次のランダム曲を引きます（候補が2曲以上あるときは、直前と同じ曲は連続で引きません）。「次のランダム」でもう1曲引けます。Mac のデスクトップ前提です。</p>
       </section>
 
       <!-- ===================== notes ===================== -->
-      <section class="panel notes" aria-label="注記">
-        <h2>正直な注記</h2>
-        <ul>
-          <li>本ページには曲データを同梱していません。お手持ちの MDX / PDX ファイルを読み込んで再生してください。動作確認用に、合成テスト曲（ドレミファソラシド）だけを内蔵しています。</li>
-          <li>FM 音源コアは <strong>本物の ymfm を WebAssembly 化した libymfm.wasm</strong>（h1romas4/libymfm.wasm、BSD-3-Clause、493,226 バイト）を使用しています。帰属表示は下の「参照実装にもとづく作り直し」にあります。</li>
-          <li>正直な限界も残ります。同じキーコードでも参照実装と約 +5/64 半音の一定のピッチ差があります。PCM のレガート時に再トリガが落ちる場合があります。エンベロープ解釈の違いで、曲によってはスペクトルの分布が参照と少しずれることがあります。</li>
-          <li>ランダム再生は、お手持ちの MDX ファイルの入ったフォルダを選んで使う方式です（フォルダ内の曲から抽選し、参照される PDX があれば自動で読み込みます）。</li>
-        </ul>
-      </section>
 
       <!-- ===================== references ===================== -->
-      <section class="panel expl" aria-label="参照実装にもとづく作り直し">
-        <h2>FM コア：本物の ymfm（WASM）＋ portable_mdx 基準の出力段</h2>
-        <p><b>FM コア：ymfm</b>（Aaron Giles、BSD-3-Clause、現在の MAME が採用する YM2151 コア）そのものを、<b>libymfm.wasm</b>（h1romas4 による WASM 化、BSD-3-Clause）としてこのページに埋め込んで動かしています。シーケンサと PCM の解釈は MXDRV の動作を参照して実装しています。</p>
-        <p><b>サードパーティ帰属表示 — ymfm / libymfm.wasm</b>：本ページの FM 音源コアは、以下の外部ソフトウェアを WebAssembly として埋め込んで使用しています。ライセンス全文は GitHub リポジトリの <code>THIRD_PARTY_NOTICES.md</code> に収録しています。</p>
-        <ul>
-          <li><b>ymfm</b> — Copyright (c) 2021, Aaron Giles. ライセンス: BSD 3-Clause License. 出典: <a href="https://github.com/aaronsgiles/ymfm">https://github.com/aaronsgiles/ymfm</a></li>
-          <li><b>libymfm.wasm</b> — Copyright (c) 2021, Hiromasa Tanaka (h1romas4). ライセンス: BSD 3-Clause License. 出典: <a href="https://github.com/h1romas4/libymfm.wasm">https://github.com/h1romas4/libymfm.wasm</a> — ymfm の WebAssembly ビルド。埋め込みバイナリ: <code>libymfm_bg.wasm</code>（493,226 バイト、SHA-256: ea79697a…）</li>
-        </ul>
-      </section>
 
       <!-- ===================== about ===================== -->
       <section class="panel expl" aria-label="解説">
@@ -668,7 +650,7 @@
         <p><b>MSM6258</b> — X68000 内蔵の ADPCM 音源。4bit ADPCM サンプルを PDX ファイルから読み、ドラムや効果音を 1 チャンネル（PCM8 モードでは多重再生）で鳴らす。X68000 ではクロック 4 MHz、サンプリング周波数は 3.9k〜15.6kHz。</p>
       </section>
 
-      <footer>Web MDX プレイヤー — 曲データは同梱していません。FM コア: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka)、BSD-3-Clause</footer>
+      <footer>FM コア: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka)、BSD-3-Clause</footer>
     </main>
 
     <!-- Embedded song data (base64). SHA-256 of each decoded file is
@@ -4697,6 +4679,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          * random mode is advancing to the next song, in which case
          * playback continues and the context stays running. */
         if (justEnded && !hookAdvances && window.__mdxContModeOn !== true) suspendCtx();
+        /* A report confirming the engine is no longer playing
+         * settles a suspend armed by pause/stop (see
+         * armSuspendPending). Reports that still say 'playing'
+         * never settle it. */
+        settleSuspendPending(s);
       }
 
       /* ---------------- spectrum analyzer (v22) ----------------
@@ -4882,13 +4869,51 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * output created later by other pages. Resuming is left to
        * the existing paths (gesture priming + ensureAudio's
        * resume), which run inside the play click. Only suspends
-       * while actually running; failures are swallowed. */
+       * while actually running; failures are swallowed. Any actual
+       * suspend also consumes a pending request (below). */
       function suspendCtx() {
+        cancelSuspendPending();
         if (!actx || actx.state !== 'running') return;
         try {
           const p = actx.suspend();
           if (p && p.catch) p.catch(() => {});
         } catch (e) { /* ignore */ }
+      }
+      /* Pending suspend (pause/stop race fix): the pause/stop
+       * buttons used to call suspendCtx() in the same synchronous
+       * handler that posted the 'pause'/'stop' command to the
+       * worklet. When the suspend won the race, the worklet froze
+       * with player.playing still true and the command still queued;
+       * on the next resume (e.g. a click after returning to the
+       * tab) the engine rendered a few quanta of the song before
+       * the queued command was applied — a brief burst of sound
+       * from a player the user had paused. So pause/stop now only
+       * ARM a suspend: it fires when a state report confirms the
+       * engine itself is no longer playing (settleSuspendPending,
+       * called at the end of showState), with a ~1 s timer as a
+       * fallback in case no confirming report ever arrives (the
+       * fallback re-checks that the UI still intends non-playing).
+       * Pressing play, or loading a song, cancels the request, so
+       * a late pause-side report can never suspend playback the
+       * user has since resumed. Natural end keeps the direct
+       * suspend in showState: its report already comes from the
+       * stopped engine, so the ordering there is correct. */
+      let suspendPending = false;
+      let suspendTimer = null;
+      function armSuspendPending() {
+        suspendPending = true;
+        if (suspendTimer != null) clearTimeout(suspendTimer);
+        suspendTimer = setTimeout(() => {
+          suspendTimer = null;
+          if (suspendPending && !isPlaying) { suspendPending = false; suspendCtx(); }
+        }, 1000);
+      }
+      function cancelSuspendPending() {
+        suspendPending = false;
+        if (suspendTimer != null) { clearTimeout(suspendTimer); suspendTimer = null; }
+      }
+      function settleSuspendPending(s) {
+        if (suspendPending && s && !s.playing) { cancelSuspendPending(); suspendCtx(); }
       }
       /* Safari (WebKit) only starts an AudioContext from inside a
        * user gesture. This page creates and resumes its context from
@@ -5151,6 +5176,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         describeSong();
         if (lzxExpanded) els.meta.textContent += ' ／ LZX圧縮ファイルを展開しました';
         document.querySelectorAll('.song').forEach(el => el.classList.toggle('playing', el.dataset && el.dataset.file === name));
+        /* A committed load supersedes any pause/stop suspend that
+         * is still pending: the new song's own state reports (and
+         * its end) drive the context from here. */
+        cancelSuspendPending();
         const be = await ensureAudio();
         if (!be) return;
         sendLoad(cur.mdx, cur.pdxBytes);
@@ -5186,16 +5215,21 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (!cur.mdx) { await loadSong(MDXEngine.buildTestMdx(), 'TEST (合成)', 'test', true); return; }
         const be = await ensureAudio(); if (!be) return;
         sendMuteSolo();
-        if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus('一時停止中'); suspendCtx(); }
-        else { sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + cur.name); }
+        if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus('一時停止中'); armSuspendPending(); }
+        else { cancelSuspendPending(); sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + cur.name); }
       });
       els.stop.addEventListener('click', async () => {
         if (window.__mdxRandomOff) window.__mdxRandomOff();
         closeVoicePanel();
         closeAnalysisPanel();
         const be = await ensureAudio(); if (!be) return;
-        sendCmd('stop'); reflectPlay(false); setStatus('停止しました。'); suspendCtx();
+        sendCmd('stop'); reflectPlay(false); setStatus('停止しました。');
         showState({ elapsed: 0, tempo: null, tickMs: null, loopCount: 0, levels: chRows.map(() => 0), keyOns: chRows.map(() => false), playing: false });
+        /* Arm after the synthetic showState above: that report is
+         * UI-made and must not settle the pending suspend — only a
+         * report from the engine itself (or the fallback timer)
+         * may, otherwise the stop race returns. */
+        armSuspendPending();
       });
       $('btnMsClear').addEventListener('click', () => {
         chMute = []; chSolo = [];
@@ -5209,7 +5243,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       });
       els.vol.addEventListener('input', () => sendCmd('volume', els.vol.value / 100));
       /* Check display (debug): enabled only by URL parameter.
-       * At load, ?debug=1 / ?debug=true / ?debug=on (case-insensitive)
+       * At load, when the development flag is set
        * adds .check-on to the common parent (player panel); anything
        * else (no parameter, other values) leaves the meta line and
        * the PDX warning hidden. No UI switch and nothing is persisted.
@@ -5267,7 +5301,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          inside the same index. The full-collection catalog mode
          (catalog.json: maker / game / title / filename / relpath /
          size / pdx_ref per song) is debug-only: it activates only
-         with ?debug=1 (the v31 check-display parameter) and is
+         with the development configuration and is
          otherwise not fetched, not shown and never drawn from.
          Picks play through the existing loadSong() path. File
          lookup keys are Unicode-normalized (NFC) and lower-cased
@@ -5286,7 +5320,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let rootFiles = null;   /* Map: normalized relpath -> File | FileSystemFileHandle */
 
       /* Catalog mode is debug-only: the same URL parameter as the
-       * v31 check display (?debug=1 / true / on, case-insensitive)
+       * v31 check display (the development configuration)
        * enables it. Without the parameter the catalog UI stays
        * hidden, no catalog is fetched, and random picks come from
        * the selected folder's MDX list instead — so the public
