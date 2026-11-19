@@ -88,7 +88,22 @@
       }
       .now-title {
         font-size: 1.28rem; font-weight: 700; line-height: 1.35;
-        word-break: break-all; margin: 0 0 4px;
+        margin: 0 0 4px;
+        overflow: hidden; white-space: nowrap;
+      }
+      /* Title marquee (v34): when the loaded song's title is wider
+       * than the NOW PLAYING row, the inner span scrolls sideways
+       * inside this row only (see updateTitleMarquee in the UI
+       * script). The row stays one line tall either way, so the
+       * panel / console layout never changes size. When the title
+       * fits — or scrolling is off (reduced motion) — the inner
+       * span is a plain ellipsis-clipped static line. */
+      .now-title-inner {
+        display: block; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; will-change: transform;
+      }
+      .now-title.scrolling .now-title-inner {
+        overflow: visible; text-overflow: clip;
       }
       .now-meta { color: var(--ink-dim); font-size: 0.86rem; margin: 0; word-break: break-all; }
       .now-meta b { color: var(--ink); font-weight: 600; }
@@ -474,7 +489,7 @@
       <!-- ===================== player ===================== -->
       <section class="panel dsp" id="playerPanel" aria-label="プレイヤー">
         <p class="micro">Now Playing</p>
-        <p class="now-title" id="nowTitle">曲が選択されていません</p>
+        <p class="now-title" id="nowTitle"><span class="now-title-inner" id="nowTitleInner">曲が選択されていません</span></p>
         <p class="now-meta" id="nowMeta">下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。</p>
         <div class="warnline" id="pdxWarn"></div>
         <div class="transport">
@@ -3803,7 +3818,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       'use strict';
       const $ = (id) => document.getElementById(id);
       const els = {
-        title: $('nowTitle'), meta: $('nowMeta'), warn: $('pdxWarn'),
+        title: $('nowTitle'), titleInner: $('nowTitleInner'), meta: $('nowMeta'), warn: $('pdxWarn'),
         play: $('btnPlay'), stop: $('btnStop'), loop: $('btnLoop'),
         playerPanel: $('playerPanel'),
         time: $('stTime'), tempo: $('stTempo'), tickMs: $('stTickMs'), loopCount: $('stLoop'),
@@ -3867,8 +3882,105 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         return null;
       }
 
+      /* ---------------- now-playing title marquee (v34) ----------------
+       * [TITLE-MQ-START] When the loaded title is wider than the
+       * NOW PLAYING row, scroll it sideways inside the row so the
+       * whole string can be read: hold at the start, scroll at
+       * TITLE_MQ_SPEED px/s until the tail is visible, hold at the
+       * end, then loop back to the start. The travel distance and
+       * the scroll duration come from the measured overflow width.
+       * A title that fits stays static. The animation lives on the
+       * inner span only, so the row height and the panel / console
+       * dimensions never change. With prefers-reduced-motion the
+       * marquee never engages and the title stays static (clipped
+       * with an ellipsis, as before). Playback state is irrelevant:
+       * whatever song is loaded gets the same treatment.
+       * updateTitleMarquee() is re-run on every song change (via
+       * describeSong) and on window resize, and always resets the
+       * scroll position to the start before re-measuring. */
+      const TITLE_MQ_SPEED = 50;        /* px per second */
+      const TITLE_MQ_HOLD_START = 1200; /* ms held at the start */
+      const TITLE_MQ_HOLD_END = 1500;   /* ms held at the end */
+      let titleMqAnim = null;
+      let titleMqState = { enabled: false, overflow: 0, distance: 0, scrollMs: 0, durationMs: 0 };
+      function titleMqReducedMotion() {
+        try {
+          return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        } catch (e) { return false; }
+      }
+      function resetTitleMarquee() {
+        if (titleMqAnim) { try { titleMqAnim.cancel(); } catch (e) { /* already gone */ } titleMqAnim = null; }
+        if (els.title) els.title.classList.remove('scrolling');
+        if (els.titleInner) els.titleInner.style.transform = '';
+        if (els.title) { delete els.title.dataset.mqDistance; delete els.title.dataset.mqDuration; }
+      }
+      function updateTitleMarquee() {
+        resetTitleMarquee();
+        titleMqState = { enabled: false, overflow: 0, distance: 0, scrollMs: 0, durationMs: 0 };
+        if (!els.title || !els.titleInner) return titleMqState;
+        const viewW = els.title.clientWidth || 0;
+        const textW = els.titleInner.scrollWidth || 0;
+        const overflow = textW - viewW;
+        if (!viewW || !(overflow > 1)) return titleMqState;
+        if (titleMqReducedMotion()) return titleMqState;
+        const distance = overflow;
+        const scrollMs = Math.round(distance / TITLE_MQ_SPEED * 1000);
+        const durationMs = TITLE_MQ_HOLD_START + scrollMs + TITLE_MQ_HOLD_END;
+        const holdEndAt = (TITLE_MQ_HOLD_START + scrollMs) / durationMs;
+        const holdStartAt = TITLE_MQ_HOLD_START / durationMs;
+        els.title.classList.add('scrolling');
+        els.title.dataset.mqDistance = String(distance);
+        els.title.dataset.mqDuration = String(durationMs);
+        if (typeof els.titleInner.animate === 'function') {
+          titleMqAnim = els.titleInner.animate([
+            { transform: 'translateX(0px)', offset: 0 },
+            { transform: 'translateX(0px)', offset: holdStartAt },
+            { transform: 'translateX(' + (-distance) + 'px)', offset: holdEndAt },
+            { transform: 'translateX(' + (-distance) + 'px)', offset: 1 }
+          ], { duration: durationMs, iterations: Infinity });
+        } else {
+          /* Fallback without the Web Animations API: same timing,
+           * driven by a CSS transition chained with timeouts. */
+          const inner = els.titleInner;
+          const step = () => {
+            inner.style.transition = 'none';
+            inner.style.transform = 'translateX(0px)';
+            titleMqAnim = { cancel: () => { clearTimeout(t1); clearTimeout(t2); } };
+            var t1 = setTimeout(() => {
+              inner.style.transition = 'transform ' + scrollMs + 'ms linear';
+              inner.style.transform = 'translateX(' + (-distance) + 'px)';
+            }, TITLE_MQ_HOLD_START);
+            var t2 = setTimeout(step, durationMs);
+          };
+          step();
+        }
+        titleMqState = { enabled: true, overflow: overflow, distance: distance, scrollMs: scrollMs, durationMs: durationMs };
+        return titleMqState;
+      }
+      /* Verification / re-measure hook (display only). */
+      window.__nowTitleMarquee = {
+        refresh: updateTitleMarquee,
+        getState: () => titleMqState
+      };
+      let titleMqResizeQueued = false;
+      window.addEventListener('resize', () => {
+        if (titleMqResizeQueued) return;
+        titleMqResizeQueued = true;
+        const run = () => { titleMqResizeQueued = false; updateTitleMarquee(); };
+        if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(run);
+        else run();
+      });
+      if (window.matchMedia) {
+        try {
+          const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+          if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', updateTitleMarquee);
+        } catch (e) { /* older engines: resize/song-change refresh still applies */ }
+      }
+      /* [TITLE-MQ-END] */
+
       function describeSong() {
-        els.title.textContent = cur.title || cur.name || '曲が選択されていません';
+        els.titleInner.textContent = cur.title || cur.name || '曲が選択されていません';
+        updateTitleMarquee();
         if (!cur.mdx) {
           els.meta.textContent = '下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。';
           els.warn.className = 'warnline'; els.warn.textContent = '';
