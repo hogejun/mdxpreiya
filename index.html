@@ -606,13 +606,17 @@
         </div>
       </section>
 
-      <!-- ===================== catalog & random ===================== -->
-      <section class="panel" aria-label="全曲カタログとランダム再生">
-        <h2>全曲カタログ＆ランダム再生テスト</h2>
-        <p class="cat-status" id="catStatus" style="margin-top:0">カタログを読み込んでいます…</p>
+      <!-- ===================== folder & random ===================== -->
+      <section class="panel" aria-label="フォルダとランダム再生">
+        <h2>ランダム再生（フォルダ方式）</h2>
+        <div id="catDebug" hidden>
+          <p class="cat-status" id="catStatus" style="margin-top:0">カタログを読み込んでいます…</p>
+          <div class="cat-actions">
+            <button class="tbtn" id="btnCatLoad" type="button">カタログ JSON を選ぶ</button>
+            <input type="file" id="catFileInput" accept=".json,application/json" hidden />
+          </div>
+        </div>
         <div class="cat-actions">
-          <button class="tbtn" id="btnCatLoad" type="button">カタログ JSON を選ぶ</button>
-          <input type="file" id="catFileInput" accept=".json,application/json" hidden />
           <button class="tbtn" id="btnRootPick" type="button">MDX フォルダを選ぶ</button>
           <input type="file" id="rootDirInput" webkitdirectory hidden />
           <button class="tbtn" id="btnRootFiles" type="button">ファイルをまとめて選ぶ</button>
@@ -621,17 +625,17 @@
         <div class="filebox rootdrop" id="rootDrop">
           <p>MDX フォルダはここへの<strong>ドラッグ＆ドロップ</strong>でも読み込めます。アプリ内ブラウザのファイル選択ではフォルダが選べないため、その場合は Finder からコレクションのフォルダをここに落としてください。メーカー別フォルダを1つずつ落として追加していくこともできます。</p>
         </div>
-        <p class="cat-status" id="rootStatus">フォルダ未選択（ランダム再生にはコレクションのフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）</p>
+        <p class="cat-status" id="rootStatus">フォルダ未選択（ランダム再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）</p>
         <div class="cat-actions">
-          <button class="tbtn primary" id="btnRandom" type="button" aria-pressed="false" disabled>ランダム再生</button>
-          <button class="tbtn" id="btnRandomNext" type="button" disabled>次のランダム</button>
+          <button class="tbtn primary" id="btnRandom" type="button" aria-pressed="false">ランダム再生</button>
+          <button class="tbtn" id="btnRandomNext" type="button">次のランダム</button>
         </div>
         <div class="randinfo" id="randInfo" hidden>
           <p class="rt" id="randTitle"></p>
           <p class="rm" id="randMeta"></p>
         </div>
         <div id="randStatus" role="status"></div>
-        <p class="cat-howto">使い方: ①カタログが読み込まれていることを確認（ページと同じ場所の catalog.json があれば自動で読み、無ければ「カタログ JSON を選ぶ」から読み込めます）→ ②コレクションを読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でルートフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）コレクションのフォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ③「ランダム再生」でカタログから無作為に1曲を選び、参照 PDX があれば同じフォルダから自動で読み込んで再生します。「次のランダム」でもう1曲引けます。Mac のデスクトップ前提です。</p>
+        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②「ランダム再生」で、読み込んだフォルダ内（サブフォルダ含む）の MDX から無作為に1曲を選び、参照 PDX があれば同じフォルダから自動で読み込んで再生します。「ランダム再生」は連続モードの切り替えで、ON の間は曲が終わるたびに次のランダム曲を引きます（候補が2曲以上あるときは、直前と同じ曲は連続で引きません）。「次のランダム」でもう1曲引けます。全曲カタログからの抽選はデバッグ用で、URL パラメータ ?debug=1 のときだけ有効です。Mac のデスクトップ前提です。</p>
       </section>
 
       <!-- ===================== notes ===================== -->
@@ -641,7 +645,7 @@
           <li>本ページには曲データを同梱していません。お手持ちの MDX / PDX ファイルを読み込んで再生してください。動作確認用に、合成テスト曲（ドレミファソラシド）だけを内蔵しています。</li>
           <li>FM 音源コアは <strong>本物の ymfm を WebAssembly 化した libymfm.wasm</strong>（h1romas4/libymfm.wasm、BSD-3-Clause、493,226 バイト）を使用しています。帰属表示は下の「参照実装にもとづく作り直し」にあります。</li>
           <li>正直な限界も残ります。同じキーコードでも参照実装と約 +5/64 半音の一定のピッチ差があります。PCM のレガート時に再トリガが落ちる場合があります。エンベロープ解釈の違いで、曲によってはスペクトルの分布が参照と少しずれることがあります。</li>
-          <li>「全曲カタログ＆ランダム再生」は、別途用意した catalog.json を読み込んだ場合に使えます（ページと同じ場所の catalog.json があれば自動で読みます）。</li>
+          <li>ランダム再生は、お手持ちの MDX ファイルの入ったフォルダを選んで使う方式です（フォルダ内の曲から抽選し、参照される PDX があれば自動で読み込みます）。</li>
         </ul>
       </section>
 
@@ -5120,8 +5124,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           mdxBytes = maybeExpandLzx(mdxBytes);
         } catch (e) { setStatus('LZX展開に失敗しました: ' + e.message); return; }
         /* A manually chosen song cancels continuous random mode;
-         * random picks load with source 'catalog' and keep it. */
-        if (source !== 'catalog' && window.__mdxRandomOff) window.__mdxRandomOff();
+         * random picks (source 'catalog' / 'folder') keep it. */
+        if (source !== 'catalog' && source !== 'folder' && window.__mdxRandomOff) window.__mdxRandomOff();
         let info;
         try { info = MDXEngine.parseMDX(mdxBytes); }
         catch (e) { setStatus('MDX の読み込みに失敗しました: ' + e.message); return; }
@@ -5255,13 +5259,19 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       els.dropBox.addEventListener('drop', (e) => handleFiles(e.dataTransfer && e.dataTransfer.files));
     </script>
 
-    <!-- ================= catalog & random playback =================
-         Reads the full-collection catalog (catalog.json: maker / game /
-         title / filename / relpath / size / pdx_ref per song), lets the
-         user pick the collection root folder once (desktop), and plays
-         random picks through the existing loadSong() path. File lookup
-         keys are Unicode-normalized (NFC) and lower-cased so the
-         catalog's NFD relpaths match real Mac files either way. -->
+    <!-- ================= folder & random playback =================
+         Standard mode is folder-based: the intake below indexes
+         whatever folder / files the user picks, random picks are
+         drawn from the .mdx files in that index (subfolders
+         included), and a pick's referenced PDX is resolved by name
+         inside the same index. The full-collection catalog mode
+         (catalog.json: maker / game / title / filename / relpath /
+         size / pdx_ref per song) is debug-only: it activates only
+         with ?debug=1 (the v31 check-display parameter) and is
+         otherwise not fetched, not shown and never drawn from.
+         Picks play through the existing loadSong() path. File
+         lookup keys are Unicode-normalized (NFC) and lower-cased
+         so NFD relpaths match real Mac files either way. -->
     <script>
       'use strict';
       const catEls = {
@@ -5272,8 +5282,24 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         info: $('randInfo'), rTitle: $('randTitle'), rMeta: $('randMeta'),
         rStatus: $('randStatus')
       };
-      let catalog = null;     /* parsed catalog.json */
+      let catalog = null;     /* parsed catalog.json (debug mode only) */
       let rootFiles = null;   /* Map: normalized relpath -> File | FileSystemFileHandle */
+
+      /* Catalog mode is debug-only: the same URL parameter as the
+       * v31 check display (?debug=1 / true / on, case-insensitive)
+       * enables it. Without the parameter the catalog UI stays
+       * hidden, no catalog is fetched, and random picks come from
+       * the selected folder's MDX list instead — so the public
+       * build (no catalog data) still gets working random play. */
+      const DEBUG_ON = (() => {
+        try {
+          const v = new URLSearchParams(location.search || '').get('debug');
+          if (!v) return false;
+          const lv = String(v).toLowerCase();
+          return lv === '1' || lv === 'true' || lv === 'on';
+        } catch (e) { return false; }
+      })();
+      if (DEBUG_ON) { const cd = $('catDebug'); if (cd) cd.hidden = false; }
 
       function normKey(p) {
         return String(p).replace(/\\/g, '/').normalize('NFC').toLowerCase();
@@ -5295,7 +5321,6 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (data.generated) msg += ' ／ 作成日 ' + data.generated;
         catEls.status.textContent = msg;
         if (rootFiles) reportRoot(lastRootName);
-        updateRandomButtons();
         return true;
       }
       async function tryFetchCatalog() {
@@ -5331,9 +5356,14 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
              files; each pick is added to the index, and files picked
              without a path are matched by file name. */
       let lastRootName = '';
+      /* Original-case relpath per normalized key, for display and
+         for building pseudo catalog entries in folder mode (the
+         index keys themselves are normalized / lower-cased). */
+      const origPaths = new Map();
       async function indexHandleTree(dirHandle, prefix, map) {
         for await (const entry of dirHandle.values()) {
           const rel = prefix ? prefix + '/' + entry.name : entry.name;
+          origPaths.set(normKey(rel), rel);
           if (entry.kind === 'file') map.set(normKey(rel), entry);
           else if (entry.kind === 'directory') await indexHandleTree(entry, rel, map);
         }
@@ -5356,10 +5386,33 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const map = new Map();
         for (const f of Array.from(files)) {
           const rel = (f.webkitRelativePath || f.name).replace(/\\/g, '/');
+          origPaths.set(normKey(rel), rel);
           map.set(normKey(rel), f);
         }
         addStrippedVariants(map);
         return map;
+      }
+      /* ---------------- folder song list ----------------
+         The standard random-pick pool: every distinct .mdx file in
+         the index (extension check on the normalized key, so .MDX
+         counts too; subfolders included). The same file can sit
+         under several keys (full path + stripped variants), so
+         dedupe by the file object itself and keep the longest key
+         as its canonical path. Rebuilt whenever the index changes. */
+      let folderSongs = [];      /* [{key, path, name, ent}] */
+      let lastFolderPick = null; /* previous folder pick (no-repeat) */
+      function rebuildFolderSongs() {
+        folderSongs = [];
+        if (!rootFiles) return;
+        const byEnt = new Map();
+        for (const [k, v] of rootFiles) {
+          if (!k.endsWith('.mdx')) continue;
+          const prev = byEnt.get(v);
+          if (!prev || k.length > prev.key.length) {
+            byEnt.set(v, { key: k, path: origPaths.get(k) || k, name: (v && v.name) || k.split('/').pop(), ent: v });
+          }
+        }
+        folderSongs = Array.from(byEnt.values());
       }
       function mergeRootFiles(map, label) {
         if (!rootFiles) rootFiles = new Map();
@@ -5368,7 +5421,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       function reportRoot(name) {
         lastRootName = name;
-        let msg = '読み込み済み: ' + name + '（索引 ' + rootFiles.size.toLocaleString('ja-JP') + ' 件）';
+        rebuildFolderSongs();
+        let msg = '読み込み済み: ' + name + '（MDX ' + folderSongs.length.toLocaleString('ja-JP') + ' 曲見つかりました ／ 索引 ' + rootFiles.size.toLocaleString('ja-JP') + ' 件）';
         if (catalog) {
           /* findFile() hits iff the exact key or the bare file name is
              in the index (its '/'-suffix scan is subsumed by the name
@@ -5385,7 +5439,6 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           msg += ' ／ カタログの ' + hit.toLocaleString('ja-JP') + ' 曲と一致';
         }
         catEls.rootStatus.textContent = msg;
-        updateRandomButtons();
       }
       $('btnRootPick').addEventListener('click', async () => {
         if (window.showDirectoryPicker) {
@@ -5446,6 +5499,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       async function collectDroppedEntry(entry, prefix, map) {
         const rel = prefix ? prefix + '/' + entry.name : entry.name;
+        origPaths.set(normKey(rel), rel);
         if (entry.isFile) {
           try { map.set(normKey(rel), await entryToFile(entry)); } catch (e) { /* skip unreadable file */ }
         } else if (entry.isDirectory) {
@@ -5535,10 +5589,13 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let contBaseLoop = null;   /* loopCount when the current pick started */
       let hookLastLoop = 0;      /* last loopCount seen, to spot song changes */
 
-      function updateRandomButtons() {
-        const ok = !!catalog && !!rootFiles;
-        catEls.random.disabled = !ok;
-        catEls.next.disabled = !ok;
+      /* A pick is possible when the folder list has songs, or when
+       * debug catalog mode is fully ready (catalog + folder). The
+       * buttons stay enabled either way: pressed with nothing to
+       * draw from, they show guidance instead of failing. */
+      function randomAvailable() {
+        if (folderSongs.length) return true;
+        return DEBUG_ON && !!catalog && !!rootFiles;
       }
       function setContMode(on) {
         contMode = on;
@@ -5568,8 +5625,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         return false;
       };
 
-      /* One pick attempt. Returns true when a song was started. */
-      async function pickRandomSong() {
+      /* One catalog pick attempt (debug mode). Returns true when
+       * a song was started. */
+      async function pickCatalogSong() {
         const entry = catalog.songs[Math.floor(Math.random() * catalog.songs.length)];
         catEls.info.hidden = false;
         catEls.rTitle.textContent = entry.title || entry.filename;
@@ -5600,11 +5658,71 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
         return true;
       }
+      /* One folder pick attempt (standard mode). Draws from the
+       * folder MDX list; with 2+ candidates the previous pick is
+       * excluded so the same song never comes up twice in a row.
+       * The referenced PDX name is read from the MDX header (via
+       * the engine's own parser, after LZX expansion when needed)
+       * and resolved inside the same index through findPdx(); no
+       * PDX found means FM-only playback, same as a manual load.
+       * Returns true when a song was started. */
+      async function pickFolderSong() {
+        if (!folderSongs.length) return false;
+        let pool = folderSongs;
+        if (pool.length >= 2 && lastFolderPick) {
+          const rest = pool.filter((s) => s !== lastFolderPick);
+          if (rest.length) pool = rest;
+        }
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        lastFolderPick = pick;
+        catEls.info.hidden = false;
+        setRandStatus('読み込み中…');
+        let mdxBytes;
+        try { mdxBytes = await readEntryBytes(pick.ent); }
+        catch (e) { setRandStatus('MDX の読み込みに失敗しました: ' + e.message); return false; }
+        let title = '';
+        let pdxRef = '';
+        try {
+          let parseBytes = mdxBytes;
+          if (typeof isLzxBytes === 'function' && isLzxBytes(parseBytes)) parseBytes = maybeExpandLzx(parseBytes);
+          const info = MDXEngine.parseMDX(parseBytes);
+          title = info.title || '';
+          pdxRef = (info.pdxName || '').replace(/\.pdx$/i, '');
+        } catch (e) { /* unparseable here: loadSong reports it below */ }
+        catEls.rTitle.textContent = title || pick.name;
+        catEls.rMeta.textContent = 'パス: ' + pick.path;
+        let pdxOverride = null;
+        if (pdxRef) {
+          const pdxEnt = findPdx({ relpath: pick.path, pdx_ref: pdxRef });
+          if (pdxEnt) {
+            try {
+              const pdxBytes = await readEntryBytes(pdxEnt);
+              pdxOverride = { bytes: pdxBytes, label: (pdxEnt.name || (pdxRef + '.PDX')) + '（フォルダ連携）', mismatch: false };
+            } catch (e) { /* PDX が読めなければ FM のみで続行 */ }
+          }
+        }
+        contBaseLoop = null; /* the state hook re-captures it for this song */
+        await loadSong(mdxBytes, pick.path, 'folder', true, pdxOverride);
+        const modeNote = contMode ? '（連続ランダム再生中）' : '';
+        if (pdxRef && !pdxOverride) {
+          setRandStatus('再生中: ' + pick.name + '（参照 PDX「' + pdxRef + '」がフォルダ内に見つからず、FM のみ再生）' + modeNote);
+        } else {
+          setRandStatus('再生中: ' + pick.name + modeNote);
+        }
+        return true;
+      }
+      /* Dispatch: debug catalog mode (when a catalog is loaded)
+       * keeps its original behaviour; everything else draws from
+       * the folder list. */
+      function pickRandomSong() {
+        if (DEBUG_ON && catalog && rootFiles) return pickCatalogSong();
+        return pickFolderSong();
+      }
       /* Continuous-mode advance: when a picked song is not in the
        * folder, pick another one instead (up to 10 attempts); if
        * every attempt fails, turn the mode OFF and say why. */
       async function advanceRandom() {
-        if (!catalog || !rootFiles || contBusy) return;
+        if (!randomAvailable() || contBusy) return;
         contBusy = true;
         try {
           for (let i = 0; i < 10; i++) {
@@ -5616,27 +5734,29 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         } finally { contBusy = false; }
       }
       async function playRandomOnce() {
-        if (!catalog || !rootFiles || contBusy) return;
+        if (!randomAvailable() || contBusy) return;
         contBusy = true;
         try { await pickRandomSong(); } finally { contBusy = false; }
       }
+      const NO_SONGS_GUIDE = 'ランダム再生には、まず「MDX フォルダを選ぶ」「ファイルをまとめて選ぶ」か、フォルダのドラッグ＆ドロップで MDX ファイルを読み込んでください。';
       catEls.random.addEventListener('click', async () => {
         if (contMode) {
           setContMode(false);
           setRandStatus('連続ランダム再生モードを OFF にしました（再生中の曲はそのまま再生します）。');
           return;
         }
-        if (!catalog || !rootFiles) return;
+        if (!randomAvailable()) { setRandStatus(NO_SONGS_GUIDE); return; }
         setContMode(true);
         setRandStatus('連続ランダム再生モード ON: 曲が終わるたびに次のランダム曲を再生します。');
         await advanceRandom();
       });
       catEls.next.addEventListener('click', () => {
-        if (contMode) advanceRandom();
-        else playRandomOnce();
+        if (contMode) { advanceRandom(); return; }
+        if (!randomAvailable()) { setRandStatus(NO_SONGS_GUIDE); return; }
+        playRandomOnce();
       });
 
-      tryFetchCatalog();
+      if (DEBUG_ON) tryFetchCatalog();
     </script>
   </body>
 </html>
