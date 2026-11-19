@@ -98,6 +98,13 @@
         border: 1px solid var(--warn-line); border-radius: 8px; font-size: 0.86rem;
       }
       .warnline.show { display: block; }
+      /* Check display (debug): NOW PLAYING meta + PDX warning are hidden
+       * unless the player panel carries .check-on, which the UI script
+       * adds only when the URL carries ?debug=1 (or true/on). Hiding is
+       * done via the common parent so it never conflicts with the
+       * existing textContent / className logic for those elements. */
+      #playerPanel:not(.check-on) .now-meta,
+      #playerPanel:not(.check-on) .warnline { display: none !important; }
       .transport { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: stretch; }
       .tbtn {
         border: 1px solid var(--line); background: var(--btn); color: var(--btn-ink);
@@ -465,7 +472,7 @@
       </section>
       <div class="console-right">
       <!-- ===================== player ===================== -->
-      <section class="panel dsp" aria-label="プレイヤー">
+      <section class="panel dsp" id="playerPanel" aria-label="プレイヤー">
         <p class="micro">Now Playing</p>
         <p class="now-title" id="nowTitle">曲が選択されていません</p>
         <p class="now-meta" id="nowMeta">下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。</p>
@@ -3812,6 +3819,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       const els = {
         title: $('nowTitle'), meta: $('nowMeta'), warn: $('pdxWarn'),
         play: $('btnPlay'), stop: $('btnStop'), loop: $('btnLoop'),
+        playerPanel: $('playerPanel'),
         time: $('stTime'), tempo: $('stTempo'), tickMs: $('stTickMs'), loopCount: $('stLoop'),
         vol: $('vol'), status: $('status'), chList: $('chList'),
         songList: $('songList'), songList2: $('songList2'), fileInput: $('fileInput'), dropBox: $('dropBox'),
@@ -5196,6 +5204,23 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         sendCmd('loop', loopOn);
       });
       els.vol.addEventListener('input', () => sendCmd('volume', els.vol.value / 100));
+      /* Check display (debug): enabled only by URL parameter.
+       * At load, ?debug=1 / ?debug=true / ?debug=on (case-insensitive)
+       * adds .check-on to the common parent (player panel); anything
+       * else (no parameter, other values) leaves the meta line and
+       * the PDX warning hidden. No UI switch and nothing is persisted.
+       * Only the display changes: the meta/warn text and class logic
+       * in describeSong(), the playback flow and setStatus() errors
+       * are all untouched. */
+      (function applyCheckDisplay() {
+        if (!els.playerPanel) return;
+        let on = false;
+        try {
+          const v = new URLSearchParams(location.search || '').get('debug');
+          if (v) { const lv = String(v).toLowerCase(); on = (lv === '1' || lv === 'true' || lv === 'on'); }
+        } catch (e) { on = false; }
+        els.playerPanel.classList.toggle('check-on', on);
+      })();
 
       /* ---------------- file loading ---------------- */
       async function handleFiles(fileList) {
