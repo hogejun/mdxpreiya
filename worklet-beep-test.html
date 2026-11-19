@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worklet beep test — MDXプレイヤー無音切り分け用</title>
+<style>
+  body { font-family: -apple-system, "Hiragino Sans", sans-serif; margin: 24px; line-height: 1.7; }
+  button { font-size: 20px; padding: 14px 28px; margin: 8px 0; }
+  pre { background: #f2f2f2; padding: 12px; white-space: pre-wrap; word-break: break-all; }
+  .verdict { font-weight: bold; font-size: 18px; }
+</style>
+</head>
+<body>
+<h1>Worklet beep test</h1>
+<p>MDXプレイヤーと同じ AudioWorklet 経路（Blob URL からモジュールを読み込み、worklet → AnalyserNode → 出力）で 440Hz を鳴らす診断ページ。エンジン／WASM／曲データは無し。音の生成だけ worklet 内の素のサイン波。</p>
+<p>手順: このページを Safari の通常タブで開き、ボタンを押す。聞こえたかと、発音中の analyserRMS を見る。</p>
+<button id="beep">🔊 ビープを鳴らす（440Hz・1秒、worklet経由）</button>
+<p class="verdict" id="verdict">まだ未実行</p>
+<pre id="log">AudioContext: 未作成
+</pre>
+<script>
+(function () {
+  var logEl = document.getElementById('log');
+  var verdictEl = document.getElementById('verdict');
+  var actx = null, analyser = null;
+
+  var PROC_SRC = [
+    'class BeepProc extends AudioWorkletProcessor {',
+    '  constructor() { super(); this.phase = 0; }',
+    '  process(inputs, outputs) {',
+    '    var out = outputs[0];',
+    '    var step = 440 / sampleRate;',
+    '    for (var i = 0; i < out[0].length; i++) {',
+    '      var s = Math.sin(2 * Math.PI * this.phase) * 0.35;',
+    '      this.phase += step; if (this.phase >= 1) this.phase -= 1;',
+    '      for (var ch = 0; ch < out.length; ch++) out[ch][i] = s;',
+    '    }',
+    '    return true;',
+    '  }',
+    '}',
+    'registerProcessor("beep-proc", BeepProc);'
+  ].join('\n');
+
+  function fmt(label) {
+    var rms = 0;
+    if (analyser) {
+      var buf = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(buf);
+      var ss = 0;
+      for (var i = 0; i < buf.length; i++) ss += buf[i] * buf[i];
+      rms = Math.sqrt(ss / buf.length);
+    }
+    return label + ': state=' + actx.state +
+      ' sampleRate=' + actx.sampleRate +
+      ' currentTime=' + actx.currentTime.toFixed(3) +
+      ' baseLatency=' + actx.baseLatency +
+      ' outputLatency=' + actx.outputLatency +
+      ' analyserRMS=' + rms.toFixed(4);
+  }
+
+  document.getElementById('beep').addEventListener('click', async function () {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        actx = new AC();
+        logEl.textContent = 'AudioContext 作成直後: state=' + actx.state + '\n';
+        analyser = actx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.connect(actx.destination);
+        var url = URL.createObjectURL(new Blob([PROC_SRC], { type: 'application/javascript' }));
+        await actx.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        var node = new AudioWorkletNode(actx, 'beep-proc', { numberOfOutputs: 1, outputChannelCount: [2] });
+        node.connect(analyser);
+        window.__beepNode = node;
+      }
+      await actx.resume();
+      logEl.textContent += fmt('resume後') + '\n';
+      verdictEl.textContent = '発音中…（聞こえたか確認してください）';
+      setTimeout(function () { logEl.textContent += fmt('発音中(0.5秒後)') + '\n'; }, 500);
+      setTimeout(function () {
+        if (window.__beepNode) { try { window.__beepNode.disconnect(); } catch (e) {} }
+        logEl.textContent += fmt('発音後(1.2秒後)') + '\n';
+        verdictEl.textContent = '終了。聞こえたかどうかと analyserRMS を報告してください。';
+      }, 1200);
+    } catch (e) {
+      verdictEl.textContent = 'エラー: ' + (e && e.message ? e.message : e);
+      logEl.textContent += 'ERROR: ' + (e && e.stack ? e.stack : e) + '\n';
+    }
+  });
+})();
+</script>
+</body>
+</html>
