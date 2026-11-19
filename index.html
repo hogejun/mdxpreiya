@@ -4667,15 +4667,24 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         /* Spectrum follows the authoritative playback state: it
          * draws only while playing and stops on pause/stop/end. */
         if (s.playing && !s.ended) specStart(); else specStop();
+        let justEnded = false;
         if (s.ended) {
-          if (!endedNotified) { endedNotified = true; setStatus('演奏が終了しました。'); }
+          if (!endedNotified) { endedNotified = true; justEnded = true; setStatus('演奏が終了しました。'); }
         } else {
           endedNotified = false;
         }
         /* Continuous random playback (catalog script) observes state
          * reports through this hook; the display logic above is
-         * unchanged and both audio backends funnel through here. */
-        if (window.__mdxStateHook) { try { window.__mdxStateHook(s); } catch (e) { /* ignore */ } }
+         * unchanged and both audio backends funnel through here.
+         * The hook reports whether continuous mode will advance to
+         * the next song (return value / window.__mdxContModeOn). */
+        let hookAdvances = false;
+        if (window.__mdxStateHook) { try { hookAdvances = window.__mdxStateHook(s) === true; } catch (e) { /* ignore */ } }
+        /* Natural end: once the UI has settled into the stopped
+         * state, suspend the audio context — unless continuous
+         * random mode is advancing to the next song, in which case
+         * playback continues and the context stays running. */
+        if (justEnded && !hookAdvances && window.__mdxContModeOn !== true) suspendCtx();
       }
 
       /* ---------------- spectrum analyzer (v22) ----------------
@@ -4853,6 +4862,21 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       async function resumeCtx() {
         try { await withTimeout(actx.resume(), 1200); } catch (e) { /* ignore */ }
+      }
+      /* Suspend the context once playback has fully stopped
+       * (stop / pause / natural end) so a stopped player does not
+       * keep holding a live rendering graph: in Safari, a context
+       * left 'running' while rendering silence can mute Web Audio
+       * output created later by other pages. Resuming is left to
+       * the existing paths (gesture priming + ensureAudio's
+       * resume), which run inside the play click. Only suspends
+       * while actually running; failures are swallowed. */
+      function suspendCtx() {
+        if (!actx || actx.state !== 'running') return;
+        try {
+          const p = actx.suspend();
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) { /* ignore */ }
       }
       /* Safari (WebKit) only starts an AudioContext from inside a
        * user gesture. This page creates and resumes its context from
@@ -5150,7 +5174,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (!cur.mdx) { await loadSong(MDXEngine.buildTestMdx(), 'TEST (合成)', 'test', true); return; }
         const be = await ensureAudio(); if (!be) return;
         sendMuteSolo();
-        if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus('一時停止中'); }
+        if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus('一時停止中'); suspendCtx(); }
         else { sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + cur.name); }
       });
       els.stop.addEventListener('click', async () => {
@@ -5158,7 +5182,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         closeVoicePanel();
         closeAnalysisPanel();
         const be = await ensureAudio(); if (!be) return;
-        sendCmd('stop'); reflectPlay(false); setStatus('停止しました。');
+        sendCmd('stop'); reflectPlay(false); setStatus('停止しました。'); suspendCtx();
         showState({ elapsed: 0, tempo: null, tickMs: null, loopCount: 0, levels: chRows.map(() => 0), keyOns: chRows.map(() => false), playing: false });
       });
       $('btnMsClear').addEventListener('click', () => {
@@ -5493,6 +5517,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       function setContMode(on) {
         contMode = on;
+        window.__mdxContModeOn = on; /* read by the UI script's natural-end suspend decision */
         catEls.random.setAttribute('aria-pressed', String(on));
         catEls.random.textContent = on ? 'ランダム再生（連続 ON）' : 'ランダム再生';
         if (!on) contBaseLoop = null;
@@ -5502,15 +5527,20 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         setContMode(false);
         setRandStatus('連続ランダム再生モードを OFF にしました。');
       };
+      window.__mdxContModeOn = false;
+      /* Returns true when this report makes continuous mode advance
+       * to the next song, so the UI script can keep the audio
+       * context running instead of suspending it at natural end. */
       window.__mdxStateHook = function (s) {
-        if (!s) return;
+        if (!s) return false;
         const lc = s.loopCount || 0;
         if (lc < hookLastLoop) contBaseLoop = lc; /* loopCount reset: a new song started */
         hookLastLoop = lc;
-        if (!contMode || contBusy) return;
-        if (s.ended) { advanceRandom(); return; }
-        if (contBaseLoop === null) { if (s.playing) contBaseLoop = lc; return; }
-        if (lc > contBaseLoop) advanceRandom();
+        if (!contMode || contBusy) return false;
+        if (s.ended) { advanceRandom(); return true; }
+        if (contBaseLoop === null) { if (s.playing) contBaseLoop = lc; return false; }
+        if (lc > contBaseLoop) { advanceRandom(); return true; }
+        return false;
       };
 
       /* One pick attempt. Returns true when a song was started. */
