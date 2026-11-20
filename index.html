@@ -4787,10 +4787,16 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         let hookAdvances = false;
         if (window.__mdxStateHook) { try { hookAdvances = window.__mdxStateHook(s) === true; } catch (e) { /* ignore */ } }
         /* Natural end: once the UI has settled into the stopped
-         * state, suspend the audio context — unless continuous
-         * random mode is advancing to the next song, in which case
-         * playback continues and the context stays running. */
-        if (justEnded && !hookAdvances && window.__mdxContModeOn !== true) suspendCtx();
+         * state, start the delayed suspend countdown (see
+         * startSuspendCountdown) — unless continuous random mode
+         * is advancing to the next song, in which case playback
+         * continues, no countdown starts and the context stays
+         * running. The engine has already stopped on this report,
+         * so the ordering rule (never suspend before the engine
+         * confirms it stopped) is preserved; isPlaying is synced
+         * to the stopped state so the countdown's expiry re-check
+         * sees the UI's non-playing intent correctly. */
+        if (justEnded && !hookAdvances && window.__mdxContModeOn !== true) { isPlaying = false; startSuspendCountdown(); }
         /* A report confirming the engine is no longer playing
          * settles a suspend armed by pause/stop (see
          * armSuspendPending). Reports that still say 'playing'
@@ -4982,7 +4988,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * the existing paths (gesture priming + ensureAudio's
        * resume), which run inside the play click. Only suspends
        * while actually running; failures are swallowed. Any actual
-       * suspend also consumes a pending request (below). */
+       * suspend also consumes any pending / countdown request
+       * (below). This is the immediate primitive: callers normally
+       * reach it only through the ~10 s countdown
+       * (startSuspendCountdown), not straight away. */
       function suspendCtx() {
         cancelSuspendPending();
         if (!actx || actx.state !== 'running') return;
@@ -4991,41 +5000,75 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           if (p && p.catch) p.catch(() => {});
         } catch (e) { /* ignore */ }
       }
-      /* Pending suspend (pause/stop race fix): the pause/stop
-       * buttons used to call suspendCtx() in the same synchronous
-       * handler that posted the 'pause'/'stop' command to the
-       * worklet. When the suspend won the race, the worklet froze
-       * with player.playing still true and the command still queued;
+      /* Pending suspend (pause/stop race fix) + delayed suspend
+       * (2026-11-20): the pause/stop buttons used to call
+       * suspendCtx() in the same synchronous handler that posted
+       * the 'pause'/'stop' command to the worklet. When the
+       * suspend won the race, the worklet froze with
+       * player.playing still true and the command still queued;
        * on the next resume (e.g. a click after returning to the
        * tab) the engine rendered a few quanta of the song before
        * the queued command was applied — a brief burst of sound
        * from a player the user had paused. So pause/stop now only
-       * ARM a suspend: it fires when a state report confirms the
-       * engine itself is no longer playing (settleSuspendPending,
-       * called at the end of showState), with a ~1 s timer as a
-       * fallback in case no confirming report ever arrives (the
-       * fallback re-checks that the UI still intends non-playing).
-       * Pressing play, or loading a song, cancels the request, so
-       * a late pause-side report can never suspend playback the
-       * user has since resumed. Natural end keeps the direct
-       * suspend in showState: its report already comes from the
-       * stopped engine, so the ordering there is correct. */
+       * ARM a suspend: it may proceed when a state report confirms
+       * the engine itself is no longer playing
+       * (settleSuspendPending, called at the end of showState),
+       * with a ~1 s timer as a fallback in case no confirming
+       * report ever arrives (the fallback re-checks that the UI
+       * still intends non-playing).
+       * On top of that, suspending on every pause/stop turned out
+       * to cost a ~0.9 s resume() stall in Safari and could emit
+       * a fragment of the previous sound when playback resumed,
+       * so a confirmed stop no longer suspends at once: it starts
+       * a ~10 s countdown (startSuspendCountdown), and only when
+       * the countdown expires with the UI still intending
+       * non-playing does suspendCtx() run. The fallback path
+       * starts the same countdown when it fires, so a stop
+       * suspends after ~11 s at worst. In normal use (play or a
+       * song load within 10 s) the suspend never fires at all.
+       * Pressing play, loading a song, or continuous random
+       * advancing to the next song (which loads a song) cancels
+       * both the pending request and the countdown via
+       * cancelSuspendPending(), so a late pause-side report — or
+       * a cancelled countdown — can never suspend playback the
+       * user has since resumed. Natural end starts the countdown
+       * directly from showState: its report already comes from
+       * the stopped engine, so the ordering there is correct.
+       * While the countdown runs the context stays 'running',
+       * rendering silence. */
+      const SUSPEND_COUNTDOWN_MS = 10000;
       let suspendPending = false;
       let suspendTimer = null;
+      let suspendCountdownTimer = null;
+      function startSuspendCountdown() {
+        if (suspendCountdownTimer != null) clearTimeout(suspendCountdownTimer);
+        suspendCountdownTimer = setTimeout(() => {
+          suspendCountdownTimer = null;
+          if (!isPlaying) suspendCtx();
+        }, SUSPEND_COUNTDOWN_MS);
+      }
       function armSuspendPending() {
         suspendPending = true;
+        /* A fresh arm supersedes any countdown already running:
+         * the delay restarts from this stop. */
+        if (suspendCountdownTimer != null) { clearTimeout(suspendCountdownTimer); suspendCountdownTimer = null; }
         if (suspendTimer != null) clearTimeout(suspendTimer);
         suspendTimer = setTimeout(() => {
           suspendTimer = null;
-          if (suspendPending && !isPlaying) { suspendPending = false; suspendCtx(); }
+          if (suspendPending && !isPlaying) { suspendPending = false; startSuspendCountdown(); }
         }, 1000);
       }
       function cancelSuspendPending() {
         suspendPending = false;
         if (suspendTimer != null) { clearTimeout(suspendTimer); suspendTimer = null; }
+        if (suspendCountdownTimer != null) { clearTimeout(suspendCountdownTimer); suspendCountdownTimer = null; }
       }
       function settleSuspendPending(s) {
-        if (suspendPending && s && !s.playing) { cancelSuspendPending(); suspendCtx(); }
+        if (suspendPending && s && !s.playing) {
+          suspendPending = false;
+          if (suspendTimer != null) { clearTimeout(suspendTimer); suspendTimer = null; }
+          startSuspendCountdown();
+        }
       }
       /* Safari (WebKit) only starts an AudioContext from inside a
        * user gesture. This page creates and resumes its context from
