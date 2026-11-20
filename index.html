@@ -113,6 +113,29 @@
         border: 1px solid var(--warn-line); border-radius: 8px; font-size: 0.86rem;
       }
       .warnline.show { display: block; }
+      /* Playback progress bar (v36): one thin bar in the NOW PLAYING
+       * panel showing the position inside one pass of the song (see
+       * updateProgress in the UI script). Display only — not
+       * interactive, no seeking. The fill is refreshed from state
+       * reports (~120 ms) and the short transition just smooths those
+       * steps; the light tick marks the loop start. The player panel
+       * always wears the dark .dsp theme, so the colors are the
+       * console's navy / light-blue palette directly. */
+      .prog {
+        position: relative; height: 6px; margin-top: 10px;
+        background: #04060f; border: 1px solid #2a5d8f; border-radius: 2px;
+        overflow: hidden;
+      }
+      .prog-fill {
+        position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+        background: linear-gradient(90deg, #1c6fb8, #54c8ff);
+        transition: width 0.12s linear;
+      }
+      .prog-loop {
+        position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px;
+        background: #dff4ff; opacity: 0.85; display: none;
+      }
+      @media (prefers-reduced-motion: reduce) { .prog-fill { transition: none; } }
       /* Check display (debug): NOW PLAYING meta + PDX warning are hidden
        * unless the player panel carries .check-on, which the UI script
        * adds only in the development configuration. Hiding is
@@ -402,6 +425,7 @@
         .console .now-meta { font-size: 0.72rem; line-height: 1.4; }
         .console .warnline { margin-top: 4px; padding: 4px 8px; font-size: 0.72rem; }
         .console .transport { margin-top: 6px; gap: 6px; }
+        .console .prog { margin-top: 5px; height: 5px; }
         .console .tbtn { min-height: 26px; padding: 3px 10px; font-size: 0.85rem; }
         .console .tbtn.primary { min-width: 100px; }
         .console .readout { margin-top: 6px; gap: 5px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -492,6 +516,7 @@
         <p class="now-title" id="nowTitle"><span class="now-title-inner" id="nowTitleInner">曲が選択されていません</span></p>
         <p class="now-meta" id="nowMeta">下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。</p>
         <div class="warnline" id="pdxWarn"></div>
+        <div class="prog" id="progBar" role="img" aria-label="再生位置（曲の1周分）"><div class="prog-fill" id="progFill"></div><div class="prog-loop" id="progLoop"></div></div>
         <div class="transport">
           <button class="tbtn primary" id="btnPlay" type="button">▶ 再生</button>
           <button class="tbtn" id="btnStop" type="button">■ 停止</button>
@@ -1468,6 +1493,7 @@ function MdxPlayer(sampleRate) {
   this.playing = false; this.ended = false;
   this.loopEnabled = true; this.loopCount = 0;
   this.userVolume = 0.9;
+  this.passInfo = null; /* v36: one-pass length / loop start, measured silently at load (report-only; see mdxMeasurePass) */
   this.chMute = []; this.chSolo = []; this._anySolo = false; /* per-channel mute/solo, set via setMuteSolo; all-false keeps the pre-mute/solo rendering path bit-identical */
   this.fadeMaster = 127; this.fadeActive = false; this.fadeSpeed = 0; this.fadeCounter = 0;
   this.pcmPan = 3;
@@ -1487,7 +1513,17 @@ function MdxPlayer(sampleRate) {
 MdxPlayer.prototype.load = function (mdxBytes, pdxBytes) {
   this.song = parseMDX(mdxBytes);
   this.pdx = pdxBytes ? parsePDX(pdxBytes) : null;
+  /* Report-only: measure one pass (intro + one loop) with a silent
+   * throwaway simulation. The ORDER matters: every YM2151 shares
+   * the single ymfm slot and only the latest instance's writes
+   * reach the chip, so the simulation (which builds its own
+   * player and core) must run BEFORE resetPlayback() — the reset
+   * then recreates a clean chip and makes this player's core the
+   * latest again, exactly as if the simulation never happened.
+   * load() is synchronous, so no render can interleave. */
+  var info = mdxMeasurePass(this.song, this.pdx, this.sr);
   this.resetPlayback();
+  this.passInfo = info;
 };
 MdxPlayer.prototype.setPDX = function (pdxBytes) {
   this.pdx = pdxBytes ? parsePDX(pdxBytes) : null;
@@ -1522,6 +1558,97 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.samplesToNextTick = 0;
   this.started = false;
 };
+/* ------------------------------------------------ pass measurement ---
+ * Report-only (v36): measure one full pass of the loaded song —
+ * intro plus a single loop traversal (the whole song when it does
+ * not loop) — by running throwaway MdxPlayer sequencers silently
+ * (tick() only; nothing is rendered, and the real player's state
+ * is never touched: the simulations have their own tracks and
+ * cores, the parsed song data is only read, and load() recreates
+ * the real core afterwards — see the ordering note there).
+ * Returns { passTicks, loopStartTick } with loopStartTick null
+ * for a non-looping song (or when only the loop start could not
+ * be pinned down), or null when no length can be determined
+ * within the tick cap (the UI then shows an empty bar).
+ *
+ * A song's tracks do not all share one loop story: a lone track
+ * may carry its own short loop (MW1_C's PCM 8 loops every 50
+ * ticks while the song pass is 7,921), and some tracks' data
+ * spans several laps before their loop point (some songs have tracks
+ * first jumping at twice the pass length). So the pass end is
+ * where the most tracks complete their first pass together:
+ * phase A runs with the engine's loop-disabled semantics (each
+ * track's loopedOnce flips at its first loop jump, and the song
+ * ends when every track has ended or looped once) and votes.
+ * Phase B runs with looping enabled and waits for that same
+ * chorus of tracks to jump again — a lone sub-loop track never
+ * reaches the chorus size — which gives the loop length, and
+ * loopStartTick = passTicks - loopLength. */
+function mdxMeasurePass(song, pdx, sampleRate) {
+  if (!song) return null;
+  var CAP = 1500000; /* ticks per phase; at the default tempo a tick is ~14 ms, so this cap is hours of music */
+  try {
+    /* ---- phase A: per-track first-jump ticks, loop disabled ---- */
+    var simA = new MdxPlayer(sampleRate);
+    simA.song = song;
+    simA.pdx = pdx || null;
+    simA.resetPlayback();
+    simA.loopEnabled = false;
+    var nA = simA.tracks.length;
+    var jumpCount = 0;
+    var freq = {}; /* tick -> number of tracks first-jumping there */
+    while (!simA.ended && simA.tickCount < CAP) {
+      var prev = [];
+      for (var a = 0; a < nA; a++) prev.push(simA.tracks[a].loopedOnce);
+      simA.tick();
+      for (var b = 0; b < nA; b++) {
+        if (!prev[b] && simA.tracks[b].loopedOnce) {
+          jumpCount++;
+          var tk = simA.tickCount;
+          freq[tk] = (freq[tk] || 0) + 1;
+        }
+      }
+    }
+    if (jumpCount === 0) {
+      /* No track loops: the pass is the whole song, if it ended. */
+      return simA.ended ? { passTicks: simA.tickCount, loopStartTick: null } : null;
+    }
+    var P = -1, chorus = 0;
+    for (var key in freq) {
+      var tt = parseInt(key, 10), cc = freq[key];
+      if (cc > chorus || (cc === chorus && (P < 0 || tt < P))) { chorus = cc; P = tt; }
+    }
+    if (!(P > 0) || chorus === 0) return null;
+    /* ---- phase B: the chorus jumps again one loop later ---- */
+    var simB = new MdxPlayer(sampleRate);
+    simB.song = song;
+    simB.pdx = pdx || null;
+    simB.resetPlayback();
+    simB.loopEnabled = true;
+    var tFirst = -1, tSecond = -1;
+    while (simB.tickCount < CAP) {
+      var beforeB = simB.loopCount;
+      simB.tick();
+      if (simB.ended) break;
+      if (simB.loopCount - beforeB >= chorus) {
+        if (tFirst < 0) tFirst = simB.tickCount;
+        else { tSecond = simB.tickCount; break; }
+      }
+    }
+    if (tFirst !== P || tSecond < 0) {
+      /* Chorus not confirmed (or no second lap within the cap):
+       * the pass length is still known; the loop start is not. */
+      return { passTicks: P, loopStartTick: null };
+    }
+    var loopLen = tSecond - tFirst;
+    var loopStart = P - loopLen;
+    if (!(loopLen > 0) || loopStart < 0 || loopStart >= P) return { passTicks: P, loopStartTick: null };
+    return { passTicks: P, loopStartTick: loopStart };
+  } catch (e) {
+    return null;
+  }
+}
+
 /* ------------------------------------------------------- mute / solo ---
  * Per-channel mute/solo driven from the UI. Semantics follow the
  * usual DAW convention: a muted channel is silent; while any solo
@@ -2111,11 +2238,28 @@ MdxPlayer.prototype.getState = function () {
       voices.push(t.voiceNum);
     }
   }
+  /* Progress report (v36, report-only): the position inside one
+   * pass, from the load-time measurement in this.passInfo. Past the
+   * first pass of a looping song the position wraps back to the
+   * loop start; a non-looping song clamps at passTicks (100% at the
+   * end). All three fields are null when the pass length is
+   * unknown. Reading state only — playback is unaffected. */
+  var passTicks = null, loopStartTick = null, passTick = null;
+  if (this.passInfo && this.passInfo.passTicks > 0) {
+    passTicks = this.passInfo.passTicks;
+    loopStartTick = (this.passInfo.loopStartTick == null) ? null : this.passInfo.loopStartTick;
+    if (loopStartTick != null && this.tickCount >= passTicks) {
+      passTick = loopStartTick + ((this.tickCount - loopStartTick) % (passTicks - loopStartTick));
+    } else {
+      passTick = Math.min(this.tickCount, passTicks);
+    }
+  }
   return {
     playing: this.playing && !this.ended, ended: this.ended,
     tick: this.tickCount, elapsed: this.elapsed,
     tempo: this.tempo, tickMs: this.tickSeconds() * 1000,
     loopCount: this.loopCount, levels: levels, keyOns: keyOns, notes: notes,
+    passTicks: passTicks, loopStartTick: loopStartTick, passTick: passTick,
     voices: voices, pans: pans,
     title: this.song ? this.song.title : '', nTracks: this.tracks.length
   };
@@ -2995,6 +3139,7 @@ function MdxPlayer(sampleRate) {
   this.playing = false; this.ended = false;
   this.loopEnabled = true; this.loopCount = 0;
   this.userVolume = 0.9;
+  this.passInfo = null; /* v36: one-pass length / loop start, measured silently at load (report-only; see mdxMeasurePass) */
   this.chMute = []; this.chSolo = []; this._anySolo = false; /* per-channel mute/solo, set via setMuteSolo; all-false keeps the pre-mute/solo rendering path bit-identical */
   this.fadeMaster = 127; this.fadeActive = false; this.fadeSpeed = 0; this.fadeCounter = 0;
   this.pcmPan = 3;
@@ -3014,7 +3159,17 @@ function MdxPlayer(sampleRate) {
 MdxPlayer.prototype.load = function (mdxBytes, pdxBytes) {
   this.song = parseMDX(mdxBytes);
   this.pdx = pdxBytes ? parsePDX(pdxBytes) : null;
+  /* Report-only: measure one pass (intro + one loop) with a silent
+   * throwaway simulation. The ORDER matters: every YM2151 shares
+   * the single ymfm slot and only the latest instance's writes
+   * reach the chip, so the simulation (which builds its own
+   * player and core) must run BEFORE resetPlayback() — the reset
+   * then recreates a clean chip and makes this player's core the
+   * latest again, exactly as if the simulation never happened.
+   * load() is synchronous, so no render can interleave. */
+  var info = mdxMeasurePass(this.song, this.pdx, this.sr);
   this.resetPlayback();
+  this.passInfo = info;
 };
 MdxPlayer.prototype.setPDX = function (pdxBytes) {
   this.pdx = pdxBytes ? parsePDX(pdxBytes) : null;
@@ -3049,6 +3204,97 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.samplesToNextTick = 0;
   this.started = false;
 };
+/* ------------------------------------------------ pass measurement ---
+ * Report-only (v36): measure one full pass of the loaded song —
+ * intro plus a single loop traversal (the whole song when it does
+ * not loop) — by running throwaway MdxPlayer sequencers silently
+ * (tick() only; nothing is rendered, and the real player's state
+ * is never touched: the simulations have their own tracks and
+ * cores, the parsed song data is only read, and load() recreates
+ * the real core afterwards — see the ordering note there).
+ * Returns { passTicks, loopStartTick } with loopStartTick null
+ * for a non-looping song (or when only the loop start could not
+ * be pinned down), or null when no length can be determined
+ * within the tick cap (the UI then shows an empty bar).
+ *
+ * A song's tracks do not all share one loop story: a lone track
+ * may carry its own short loop (MW1_C's PCM 8 loops every 50
+ * ticks while the song pass is 7,921), and some tracks' data
+ * spans several laps before their loop point (some songs have tracks
+ * first jumping at twice the pass length). So the pass end is
+ * where the most tracks complete their first pass together:
+ * phase A runs with the engine's loop-disabled semantics (each
+ * track's loopedOnce flips at its first loop jump, and the song
+ * ends when every track has ended or looped once) and votes.
+ * Phase B runs with looping enabled and waits for that same
+ * chorus of tracks to jump again — a lone sub-loop track never
+ * reaches the chorus size — which gives the loop length, and
+ * loopStartTick = passTicks - loopLength. */
+function mdxMeasurePass(song, pdx, sampleRate) {
+  if (!song) return null;
+  var CAP = 1500000; /* ticks per phase; at the default tempo a tick is ~14 ms, so this cap is hours of music */
+  try {
+    /* ---- phase A: per-track first-jump ticks, loop disabled ---- */
+    var simA = new MdxPlayer(sampleRate);
+    simA.song = song;
+    simA.pdx = pdx || null;
+    simA.resetPlayback();
+    simA.loopEnabled = false;
+    var nA = simA.tracks.length;
+    var jumpCount = 0;
+    var freq = {}; /* tick -> number of tracks first-jumping there */
+    while (!simA.ended && simA.tickCount < CAP) {
+      var prev = [];
+      for (var a = 0; a < nA; a++) prev.push(simA.tracks[a].loopedOnce);
+      simA.tick();
+      for (var b = 0; b < nA; b++) {
+        if (!prev[b] && simA.tracks[b].loopedOnce) {
+          jumpCount++;
+          var tk = simA.tickCount;
+          freq[tk] = (freq[tk] || 0) + 1;
+        }
+      }
+    }
+    if (jumpCount === 0) {
+      /* No track loops: the pass is the whole song, if it ended. */
+      return simA.ended ? { passTicks: simA.tickCount, loopStartTick: null } : null;
+    }
+    var P = -1, chorus = 0;
+    for (var key in freq) {
+      var tt = parseInt(key, 10), cc = freq[key];
+      if (cc > chorus || (cc === chorus && (P < 0 || tt < P))) { chorus = cc; P = tt; }
+    }
+    if (!(P > 0) || chorus === 0) return null;
+    /* ---- phase B: the chorus jumps again one loop later ---- */
+    var simB = new MdxPlayer(sampleRate);
+    simB.song = song;
+    simB.pdx = pdx || null;
+    simB.resetPlayback();
+    simB.loopEnabled = true;
+    var tFirst = -1, tSecond = -1;
+    while (simB.tickCount < CAP) {
+      var beforeB = simB.loopCount;
+      simB.tick();
+      if (simB.ended) break;
+      if (simB.loopCount - beforeB >= chorus) {
+        if (tFirst < 0) tFirst = simB.tickCount;
+        else { tSecond = simB.tickCount; break; }
+      }
+    }
+    if (tFirst !== P || tSecond < 0) {
+      /* Chorus not confirmed (or no second lap within the cap):
+       * the pass length is still known; the loop start is not. */
+      return { passTicks: P, loopStartTick: null };
+    }
+    var loopLen = tSecond - tFirst;
+    var loopStart = P - loopLen;
+    if (!(loopLen > 0) || loopStart < 0 || loopStart >= P) return { passTicks: P, loopStartTick: null };
+    return { passTicks: P, loopStartTick: loopStart };
+  } catch (e) {
+    return null;
+  }
+}
+
 /* ------------------------------------------------------- mute / solo ---
  * Per-channel mute/solo driven from the UI. Semantics follow the
  * usual DAW convention: a muted channel is silent; while any solo
@@ -3638,11 +3884,28 @@ MdxPlayer.prototype.getState = function () {
       voices.push(t.voiceNum);
     }
   }
+  /* Progress report (v36, report-only): the position inside one
+   * pass, from the load-time measurement in this.passInfo. Past the
+   * first pass of a looping song the position wraps back to the
+   * loop start; a non-looping song clamps at passTicks (100% at the
+   * end). All three fields are null when the pass length is
+   * unknown. Reading state only — playback is unaffected. */
+  var passTicks = null, loopStartTick = null, passTick = null;
+  if (this.passInfo && this.passInfo.passTicks > 0) {
+    passTicks = this.passInfo.passTicks;
+    loopStartTick = (this.passInfo.loopStartTick == null) ? null : this.passInfo.loopStartTick;
+    if (loopStartTick != null && this.tickCount >= passTicks) {
+      passTick = loopStartTick + ((this.tickCount - loopStartTick) % (passTicks - loopStartTick));
+    } else {
+      passTick = Math.min(this.tickCount, passTicks);
+    }
+  }
   return {
     playing: this.playing && !this.ended, ended: this.ended,
     tick: this.tickCount, elapsed: this.elapsed,
     tempo: this.tempo, tickMs: this.tickSeconds() * 1000,
     loopCount: this.loopCount, levels: levels, keyOns: keyOns, notes: notes,
+    passTicks: passTicks, loopStartTick: loopStartTick, passTick: passTick,
     voices: voices, pans: pans,
     title: this.song ? this.song.title : '', nTracks: this.tracks.length
   };
@@ -3822,6 +4085,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         play: $('btnPlay'), stop: $('btnStop'), loop: $('btnLoop'),
         playerPanel: $('playerPanel'),
         time: $('stTime'), tempo: $('stTempo'), tickMs: $('stTickMs'), loopCount: $('stLoop'),
+        progFill: $('progFill'), progLoop: $('progLoop'),
         vol: $('vol'), status: $('status'), chList: $('chList'),
         songList: $('songList'), songList2: $('songList2'), fileInput: $('fileInput'), dropBox: $('dropBox'),
         spec: $('specCanvas'),
@@ -4738,6 +5002,66 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         getState: () => ({ open: anCh != null, ch: anCh, draws: anDraws, samples: anData ? anData.pitch.length : 0, playing: anPlaying,
           meters: { draws: meterDraws, raf: !!meterRAF, tunerPos: mtTuner.pos, tunerTarget: mtTuner.target, vuPos: mtVu.pos, vuTarget: mtVu.target } })
       };
+      /* ---------------- playback progress bar (v36) ----------------
+       * [PROG-START] Display-only: a thin horizontal bar in the NOW
+       * PLAYING panel showing the position inside one pass of the
+       * song (intro + one loop; the whole song when it does not
+       * loop). The engine measures the pass at load time with a
+       * silent sequencer simulation and reports passTicks /
+       * loopStartTick / passTick with every state report; the bar
+       * just renders passTick / passTicks, so a looping song's bar
+       * returns to the loop-start position (marked by the thin light
+       * tick) on every lap. No seeking: the bar is not interactive.
+       * When the pass length is unknown the fill stays at 0.
+       * Pausing freezes the bar (reports stop arriving), stopping
+       * resets it to 0, and a song change resets it until the new
+       * song's first report arrives. */
+      const progState = { passTicks: null, loopStartTick: null, pct: -1, loopPct: -1 };
+      function resetProgress() {
+        /* Clear only the pass info; updateProgress then recomputes
+         * the fill (0) and the loop marker (hidden) and writes any
+         * DOM changes itself. (Pre-setting pct / loopPct to their
+         * sentinel values here would suppress those writes and
+         * leave a stale marker from the previous song visible.) */
+        progState.passTicks = null; progState.loopStartTick = null;
+        updateProgress({});
+      }
+      function updateProgress(s) {
+        if (!els.progFill) return;
+        if (!s || s.tick === undefined) {
+          /* UI-made reset report (stop button / song load): the
+           * engine's own reports always carry a tick; these do not,
+           * so the previous song's pass length must not leak into
+           * the bar. The engine's next real report restores it. */
+          progState.passTicks = null; progState.loopStartTick = null;
+        } else if (s.passTicks !== undefined) {
+          progState.passTicks = s.passTicks;
+          progState.loopStartTick = (s.loopStartTick === undefined) ? null : s.loopStartTick;
+        }
+        const P = progState.passTicks;
+        let pct = 0;
+        if (P && s && s.passTick != null) pct = Math.min(100, Math.max(0, s.passTick / P * 100));
+        if (pct !== progState.pct) {
+          progState.pct = pct;
+          els.progFill.style.width = pct + '%';
+        }
+        let loopPct = -1;
+        if (P && progState.loopStartTick != null && progState.loopStartTick > 0) {
+          loopPct = Math.min(100, Math.max(0, progState.loopStartTick / P * 100));
+        }
+        if (loopPct !== progState.loopPct) {
+          progState.loopPct = loopPct;
+          if (els.progLoop) {
+            if (loopPct >= 0) { els.progLoop.style.display = 'block'; els.progLoop.style.left = loopPct + '%'; }
+            else els.progLoop.style.display = 'none';
+          }
+        }
+      }
+      window.__mdxProgress = {
+        update: updateProgress, reset: resetProgress,
+        getState: () => ({ passTicks: progState.passTicks, loopStartTick: progState.loopStartTick, pct: progState.pct, loopPct: progState.loopPct })
+      };
+      /* [PROG-END] */
       let endedNotified = false;
       function showState(s) {
         if (!s) return;
@@ -4752,6 +5076,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (els.tickMs.textContent !== tk) els.tickMs.textContent = tk;
         const lc = String(s.loopCount || 0);
         if (els.loopCount.textContent !== lc) els.loopCount.textContent = lc;
+        updateProgress(s);
         const pl = s.playing ? '❚❚ 一時停止' : '▶ 再生';
         if (els.play.textContent !== pl) els.play.textContent = pl;
         if (s.levels) {
@@ -5329,6 +5654,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           pdxMismatch: pdx ? pdx.mismatch : false, source
         };
         describeSong();
+        resetProgress(); /* the progress bar restarts empty for the new song, until its first state report */
         if (lzxExpanded) els.meta.textContent += ' ／ LZX圧縮ファイルを展開しました';
         document.querySelectorAll('.song').forEach(el => el.classList.toggle('playing', el.dataset && el.dataset.file === name));
         /* A committed load supersedes any pause/stop suspend that
