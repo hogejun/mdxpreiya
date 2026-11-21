@@ -1356,6 +1356,12 @@ var MDX_VOL_CONV = [85,87,90,93,95,98,101,103,106,109,111,114,117,119,122,125];
 var MDX_MASTER_VOL_TABLE = [0,18,28,36,42,46,51,54,57,60,62,65,67,69,70,72,74,75,77,78,79,81,82,83,84,85,86,87,88,89,90,90,91,92,93,93,94,95,96,96,97,97,98,99,99,100,100,101,102,102,103,103,104,104,105,105,105,106,106,107,107,108,108,109,109,109,110,110,111,111,111,112,112,112,113,113,113,114,114,114,115,115,115,116,116,116,117,117,117,117,118,118,118,119,119,119,119,120,120,120,120,121,121,121,122,122,122,122,122,123,123,123,123,124,124,124,124,125,125,125,125,125,126,126,126,126,127,127];
 var MDX_PCM_FREQ = [3906.25, 5208.33, 7812.5, 10416.67, 15625]; /* MSM6258 @ 4 MHz: /1024 /768 /512 /384 /256 */
 var PCM8_VOL_TBL = [2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80]; /* X68Sound PCM8VOLTBL, gain = value / 16 */
+/* E7 fade-out gain for the PCM side (v41): one fade attenuation step
+ * is one OPM TL step (0.75 dB), so the linear gain for attenuation a
+ * is 10^(-0.75 * a / 20). Index 0 is exactly 1, so songs that never
+ * fade render bit-identically. */
+var MDX_FADE_GAIN_TABLE = [];
+for (var _fadeFi = 0; _fadeFi < 128; _fadeFi++) MDX_FADE_GAIN_TABLE.push(Math.pow(10, -0.0375 * _fadeFi));
 
 function mdxNewLFO() {
   return { on: false, wave: 0, lenRaw: 0, lenCooked: 0, length: 0,
@@ -1501,7 +1507,7 @@ function MdxPlayer(sampleRate) {
   this.userVolume = 0.9;
   this.passInfo = null; /* v36: one-pass length / loop start, measured silently at load (report-only; see mdxMeasurePass) */
   this.chMute = []; this.chSolo = []; this._anySolo = false; /* per-channel mute/solo, set via setMuteSolo; all-false keeps the pre-mute/solo rendering path bit-identical */
-  this.fadeMaster = 127; this.fadeActive = false; this.fadeSpeed = 0; this.fadeCounter = 0;
+  this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeSpeed = 0; this.fadeCounter = 0;
   this.pcmPan = 3;
   /* X68Sound shared ADPCM output stage state (stereo, 62.5 kHz) */
   this.adS1 = [0, 0]; this.adS2 = [0, 0];
@@ -1553,7 +1559,7 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.tempo = 200;
   this.tickCount = 0; this.elapsed = 0;
   this.ended = false; this.loopCount = 0;
-  this.fadeMaster = 127; this.fadeActive = false; this.fadeCounter = 0;
+  this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeCounter = 0;
   this.pcmPan = 3;
   this.adS1 = [0, 0]; this.adS2 = [0, 0];
   this.adY1 = [0, 0]; this.adY2 = [0, 0];
@@ -1712,8 +1718,9 @@ MdxPlayer.prototype.volumeWrite = function (t) {
    * 127. The total attenuation is the sum of the volume attenuation
    * (127 - volume; the v0-v15 table form and the direct form both
    * reduce to this, via MDX_VOL_CONV and 255 - v respectively), the
-   * fade-out attenuation (127 - fadeMaster, so the E7 fade adds in
-   * the same domain instead of scaling through MDX_MASTER_VOL_TABLE)
+   * fade-out attenuation (this.fadeAtten, MXDRV's L001e14, so the
+   * E7 fade adds in the same domain instead of scaling through a
+   * master table)
    * and the volume LFO offset's high byte (which only ever pulls the
    * volume down from nominal). The previous mdxmini-style
    * multiplicative form, 127 - floor(master * vol * (127 - voiceTL)
@@ -1723,8 +1730,10 @@ MdxPlayer.prototype.volumeWrite = function (t) {
    * multi-carrier balances — the main cause of the spectral
    * distribution gap (e.g. one song's centroid). The PCM side does not
    * pass through here (it returns above) and keeps its measured
-   * PCM8 volume path, fade factor included, unchanged. */
-  var atten = (127 - t.volume) + (127 - this.fadeMaster) + (t.volLfo.offset >>> 8);
+   * PCM8 volume path; since v41 the PCM side applies the same
+   * fadeAtten as a linear gain (MDX_FADE_GAIN_TABLE) instead of
+   * the old master-table factor, so FM and PCM fade together. */
+  var atten = (127 - t.volume) + this.fadeAtten + (t.volLfo.offset >>> 8);
   atten = mdxClamp(atten, 0, 127);
   var ch = t.idx;
   for (var i = 0; i < 4; i++) {
@@ -2084,7 +2093,12 @@ MdxPlayer.prototype.parseEvent = function (t) {
       var b1 = d[t.ptr++];
       if (b1 === 0) { t.ptr++; this.fadeSpeed = 5; }
       else this.fadeSpeed = d[t.ptr++];
-      this.fadeActive = true; this.fadeCounter = 0;
+      /* MXDRV (mxdrv.cpp L0016b8): the speed byte becomes the fade
+       * counter's reload value (L001e1e) and the fade is armed
+       * (L001e17 = SET). The attenuation (fadeAtten) is not reset
+       * here, and the counter is loaded from the speed on the
+       * first fade tick in tick(), not at parse time. */
+      this.fadeActive = true; this.fadeArmed = true;
       return 0;
     }
     default: /* 0xE0..0xE6 undefined */
@@ -2106,11 +2120,26 @@ MdxPlayer.prototype.tick = function () {
   if (this.ended) return;
   this.elapsed += this.tickSeconds();
   this.tickCount++;
-  if (this.fadeActive && this.fadeMaster > 0) {
-    this.fadeCounter++;
-    if (this.fadeCounter >= this.fadeSpeed + 1) {
-      this.fadeCounter = 0; this.fadeMaster--;
-      if (this.fadeMaster <= 0) { this.fadeMaster = 0; this.endSong(); return; }
+  /* E7 fade-out driver: MXDRV's L0000dc state machine (v41).
+   * Each tick, an armed fade first loads its counter from the
+   * speed (the E7 operand, L001e1e) and falls through to the
+   * same test; a running fade decrements the counter by 2 per
+   * tick, and once the counter has gone negative the fade
+   * attenuation (fadeAtten, L001e14) advances by 1 and the
+   * counter reloads. The tick the attenuation is found at 62
+   * (0x3e) the song ends. The old driver walked a 127-step
+   * master level down at one step per fadeSpeed+1 ticks, so the
+   * second half of every fade was inaudible waiting (FM is
+   * already ~46 dB down at 62 attenuation steps) and the PCM
+   * side followed a different, shallower table curve. */
+  if (this.fadeActive) {
+    if (this.fadeArmed) { this.fadeArmed = false; this.fadeCounter = this.fadeSpeed; }
+    if (this.fadeCounter < 0) {
+      if (this.fadeAtten >= 62) { this.fadeActive = false; this.endSong(); return; }
+      this.fadeAtten++;
+      this.fadeCounter = this.fadeSpeed;
+    } else {
+      this.fadeCounter -= 2;
     }
   }
   for (var i = 0; i < this.tracks.length; i++) {
@@ -2220,7 +2249,7 @@ MdxPlayer.prototype.render = function (outL, outR, frames) {
  * side is mixed before the final clamp and resampling FIR,
  * exactly as in X68Sound. */
 MdxPlayer.prototype.pcmNativeInto = function (ym) {
-  var master = MDX_MASTER_VOL_TABLE[this.fadeMaster & 0x7F];
+  var fadeGain = MDX_FADE_GAIN_TABLE[this.fadeAtten];
   var sumL = 0, sumR = 0;
   for (var i = 8; i < this.tracks.length; i++) {
     var t = this.tracks[i];
@@ -2244,9 +2273,12 @@ MdxPlayer.prototype.pcmNativeInto = function (ym) {
      * PCM about 2.4x too loud against portable_mdx; other songs' PCM
      * tracks set no volume and sat at the default index 8 under
      * both schemes, which is why only those were off. The master
-     * factor keeps the MXDRV fade working on the PCM side. */
+     * fade gain (v41: MDX_FADE_GAIN_TABLE, derived from the same
+     * fadeAtten the FM side adds to its carrier TLs, replacing the
+     * old MDX_MASTER_VOL_TABLE factor) keeps the MXDRV fade
+     * working on the PCM side with the same envelope as FM. */
     var vi = (this.song && this.song.isPCM8) ? t.pcmVolIndex : 8;
-    var voice = (t.pcmF2 / 512) * (PCM8_VOL_TBL[vi] / 16) * (master / 127);
+    var voice = (t.pcmF2 / 512) * (PCM8_VOL_TBL[vi] / 16) * fadeGain;
     var a = voice < 0 ? -voice : voice;
     if (a / 524288 > t.pcmLevel) t.pcmLevel = a / 524288;
     if (t.pan & 2) sumL += voice; /* MXDRV pan: 2 = left */
@@ -3137,6 +3169,12 @@ var MDX_VOL_CONV = [85,87,90,93,95,98,101,103,106,109,111,114,117,119,122,125];
 var MDX_MASTER_VOL_TABLE = [0,18,28,36,42,46,51,54,57,60,62,65,67,69,70,72,74,75,77,78,79,81,82,83,84,85,86,87,88,89,90,90,91,92,93,93,94,95,96,96,97,97,98,99,99,100,100,101,102,102,103,103,104,104,105,105,105,106,106,107,107,108,108,109,109,109,110,110,111,111,111,112,112,112,113,113,113,114,114,114,115,115,115,116,116,116,117,117,117,117,118,118,118,119,119,119,119,120,120,120,120,121,121,121,122,122,122,122,122,123,123,123,123,124,124,124,124,125,125,125,125,125,126,126,126,126,127,127];
 var MDX_PCM_FREQ = [3906.25, 5208.33, 7812.5, 10416.67, 15625]; /* MSM6258 @ 4 MHz: /1024 /768 /512 /384 /256 */
 var PCM8_VOL_TBL = [2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80]; /* X68Sound PCM8VOLTBL, gain = value / 16 */
+/* E7 fade-out gain for the PCM side (v41): one fade attenuation step
+ * is one OPM TL step (0.75 dB), so the linear gain for attenuation a
+ * is 10^(-0.75 * a / 20). Index 0 is exactly 1, so songs that never
+ * fade render bit-identically. */
+var MDX_FADE_GAIN_TABLE = [];
+for (var _fadeFi = 0; _fadeFi < 128; _fadeFi++) MDX_FADE_GAIN_TABLE.push(Math.pow(10, -0.0375 * _fadeFi));
 
 function mdxNewLFO() {
   return { on: false, wave: 0, lenRaw: 0, lenCooked: 0, length: 0,
@@ -3282,7 +3320,7 @@ function MdxPlayer(sampleRate) {
   this.userVolume = 0.9;
   this.passInfo = null; /* v36: one-pass length / loop start, measured silently at load (report-only; see mdxMeasurePass) */
   this.chMute = []; this.chSolo = []; this._anySolo = false; /* per-channel mute/solo, set via setMuteSolo; all-false keeps the pre-mute/solo rendering path bit-identical */
-  this.fadeMaster = 127; this.fadeActive = false; this.fadeSpeed = 0; this.fadeCounter = 0;
+  this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeSpeed = 0; this.fadeCounter = 0;
   this.pcmPan = 3;
   /* X68Sound shared ADPCM output stage state (stereo, 62.5 kHz) */
   this.adS1 = [0, 0]; this.adS2 = [0, 0];
@@ -3334,7 +3372,7 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.tempo = 200;
   this.tickCount = 0; this.elapsed = 0;
   this.ended = false; this.loopCount = 0;
-  this.fadeMaster = 127; this.fadeActive = false; this.fadeCounter = 0;
+  this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeCounter = 0;
   this.pcmPan = 3;
   this.adS1 = [0, 0]; this.adS2 = [0, 0];
   this.adY1 = [0, 0]; this.adY2 = [0, 0];
@@ -3493,8 +3531,9 @@ MdxPlayer.prototype.volumeWrite = function (t) {
    * 127. The total attenuation is the sum of the volume attenuation
    * (127 - volume; the v0-v15 table form and the direct form both
    * reduce to this, via MDX_VOL_CONV and 255 - v respectively), the
-   * fade-out attenuation (127 - fadeMaster, so the E7 fade adds in
-   * the same domain instead of scaling through MDX_MASTER_VOL_TABLE)
+   * fade-out attenuation (this.fadeAtten, MXDRV's L001e14, so the
+   * E7 fade adds in the same domain instead of scaling through a
+   * master table)
    * and the volume LFO offset's high byte (which only ever pulls the
    * volume down from nominal). The previous mdxmini-style
    * multiplicative form, 127 - floor(master * vol * (127 - voiceTL)
@@ -3504,8 +3543,10 @@ MdxPlayer.prototype.volumeWrite = function (t) {
    * multi-carrier balances — the main cause of the spectral
    * distribution gap (e.g. one song's centroid). The PCM side does not
    * pass through here (it returns above) and keeps its measured
-   * PCM8 volume path, fade factor included, unchanged. */
-  var atten = (127 - t.volume) + (127 - this.fadeMaster) + (t.volLfo.offset >>> 8);
+   * PCM8 volume path; since v41 the PCM side applies the same
+   * fadeAtten as a linear gain (MDX_FADE_GAIN_TABLE) instead of
+   * the old master-table factor, so FM and PCM fade together. */
+  var atten = (127 - t.volume) + this.fadeAtten + (t.volLfo.offset >>> 8);
   atten = mdxClamp(atten, 0, 127);
   var ch = t.idx;
   for (var i = 0; i < 4; i++) {
@@ -3865,7 +3906,12 @@ MdxPlayer.prototype.parseEvent = function (t) {
       var b1 = d[t.ptr++];
       if (b1 === 0) { t.ptr++; this.fadeSpeed = 5; }
       else this.fadeSpeed = d[t.ptr++];
-      this.fadeActive = true; this.fadeCounter = 0;
+      /* MXDRV (mxdrv.cpp L0016b8): the speed byte becomes the fade
+       * counter's reload value (L001e1e) and the fade is armed
+       * (L001e17 = SET). The attenuation (fadeAtten) is not reset
+       * here, and the counter is loaded from the speed on the
+       * first fade tick in tick(), not at parse time. */
+      this.fadeActive = true; this.fadeArmed = true;
       return 0;
     }
     default: /* 0xE0..0xE6 undefined */
@@ -3887,11 +3933,26 @@ MdxPlayer.prototype.tick = function () {
   if (this.ended) return;
   this.elapsed += this.tickSeconds();
   this.tickCount++;
-  if (this.fadeActive && this.fadeMaster > 0) {
-    this.fadeCounter++;
-    if (this.fadeCounter >= this.fadeSpeed + 1) {
-      this.fadeCounter = 0; this.fadeMaster--;
-      if (this.fadeMaster <= 0) { this.fadeMaster = 0; this.endSong(); return; }
+  /* E7 fade-out driver: MXDRV's L0000dc state machine (v41).
+   * Each tick, an armed fade first loads its counter from the
+   * speed (the E7 operand, L001e1e) and falls through to the
+   * same test; a running fade decrements the counter by 2 per
+   * tick, and once the counter has gone negative the fade
+   * attenuation (fadeAtten, L001e14) advances by 1 and the
+   * counter reloads. The tick the attenuation is found at 62
+   * (0x3e) the song ends. The old driver walked a 127-step
+   * master level down at one step per fadeSpeed+1 ticks, so the
+   * second half of every fade was inaudible waiting (FM is
+   * already ~46 dB down at 62 attenuation steps) and the PCM
+   * side followed a different, shallower table curve. */
+  if (this.fadeActive) {
+    if (this.fadeArmed) { this.fadeArmed = false; this.fadeCounter = this.fadeSpeed; }
+    if (this.fadeCounter < 0) {
+      if (this.fadeAtten >= 62) { this.fadeActive = false; this.endSong(); return; }
+      this.fadeAtten++;
+      this.fadeCounter = this.fadeSpeed;
+    } else {
+      this.fadeCounter -= 2;
     }
   }
   for (var i = 0; i < this.tracks.length; i++) {
@@ -4001,7 +4062,7 @@ MdxPlayer.prototype.render = function (outL, outR, frames) {
  * side is mixed before the final clamp and resampling FIR,
  * exactly as in X68Sound. */
 MdxPlayer.prototype.pcmNativeInto = function (ym) {
-  var master = MDX_MASTER_VOL_TABLE[this.fadeMaster & 0x7F];
+  var fadeGain = MDX_FADE_GAIN_TABLE[this.fadeAtten];
   var sumL = 0, sumR = 0;
   for (var i = 8; i < this.tracks.length; i++) {
     var t = this.tracks[i];
@@ -4025,9 +4086,12 @@ MdxPlayer.prototype.pcmNativeInto = function (ym) {
      * PCM about 2.4x too loud against portable_mdx; other songs' PCM
      * tracks set no volume and sat at the default index 8 under
      * both schemes, which is why only those were off. The master
-     * factor keeps the MXDRV fade working on the PCM side. */
+     * fade gain (v41: MDX_FADE_GAIN_TABLE, derived from the same
+     * fadeAtten the FM side adds to its carrier TLs, replacing the
+     * old MDX_MASTER_VOL_TABLE factor) keeps the MXDRV fade
+     * working on the PCM side with the same envelope as FM. */
     var vi = (this.song && this.song.isPCM8) ? t.pcmVolIndex : 8;
-    var voice = (t.pcmF2 / 512) * (PCM8_VOL_TBL[vi] / 16) * (master / 127);
+    var voice = (t.pcmF2 / 512) * (PCM8_VOL_TBL[vi] / 16) * fadeGain;
     var a = voice < 0 ? -voice : voice;
     if (a / 524288 > t.pcmLevel) t.pcmLevel = a / 524288;
     if (t.pan & 2) sumL += voice; /* MXDRV pan: 2 = left */
