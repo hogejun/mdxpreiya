@@ -1721,7 +1721,15 @@ MdxPlayer.prototype.freqWrite = function (t) {
   var porta = mdxDecompose(mdxTruncDiv(t.portamento * t.portaStep, 256));
   var lfoF = t.pitchLfo.offset >> 16; /* MXDRV adds S0036>>16 (1/64 semitones) */
   var lfo = mdxDecompose(lfoF);
-  var kf = det.kf + porta.kf + lfo.kf;
+  /* MXDRV adds +5 to the key value (key code << 6, then +5) before
+   * the detune is added: the X68000's OPM runs at 4 MHz, so a key
+   * code used uncorrected sounds about 5/64 semitone (approx. 7.8
+   * cents) flat. The +5 is part of the total 1/64-semitone offset,
+   * so it joins the kf sum here and the normalisation below carries
+   * it into scale / octave exactly like any other offset.
+   * mdxKcToMidi subtracts the same +5 so pitch reports stay
+   * anchored to the nominal note. */
+  var kf = det.kf + porta.kf + lfo.kf + 5;
   var scaleExtra = det.scale + porta.scale + lfo.scale;
   var octExtra = det.oct + porta.oct + lfo.oct;
   scaleExtra += mdxFloorDiv(kf, 64);
@@ -2141,11 +2149,17 @@ MdxPlayer.prototype.pcmNativeInto = function (ym) {
  * index in the valid sequence is the semitone within the octave; the
  * KF fraction adds ((kf>>2)&63)/64 semitone. The +15 anchors the pair
  * to the reference chain's pitch: KC 0x3C (octave 3, code 12) sounds
- * as C4 = MIDI 60 (see the pitch check near YM_NOTE_TABLE above). */
+ * as C4 = MIDI 60 (see the pitch check near YM_NOTE_TABLE above).
+ * The fraction term subtracts 5 again: freqWrite writes every pair
+ * with MXDRV's +5 key correction included, and that correction is
+ * not part of the note's own pitch, so a plain note still reports
+ * exactly its nominal pitch (a detune reading of 0 cents); when the
+ * written fraction is below 5 the float sum borrows from the
+ * semitone on its own. */
 function mdxKcToMidi(kc, kfReg) {
   var code = kc & 0x0F;
   var semi = code - (code >= 3 ? 1 : 0) - (code >= 7 ? 1 : 0) - (code >= 11 ? 1 : 0) - (code >= 15 ? 1 : 0);
-  return (kc >> 4) * 12 + semi + 15 + ((kfReg >> 2) & 0x3F) / 64;
+  return (kc >> 4) * 12 + semi + 15 + (((kfReg >> 2) & 0x3F) - 5) / 64;
 }
 /* ------------------------------------------------- channel trace (v25) ---
  * Report-only history for the channel analysis panel: every tick,
@@ -3367,7 +3381,15 @@ MdxPlayer.prototype.freqWrite = function (t) {
   var porta = mdxDecompose(mdxTruncDiv(t.portamento * t.portaStep, 256));
   var lfoF = t.pitchLfo.offset >> 16; /* MXDRV adds S0036>>16 (1/64 semitones) */
   var lfo = mdxDecompose(lfoF);
-  var kf = det.kf + porta.kf + lfo.kf;
+  /* MXDRV adds +5 to the key value (key code << 6, then +5) before
+   * the detune is added: the X68000's OPM runs at 4 MHz, so a key
+   * code used uncorrected sounds about 5/64 semitone (approx. 7.8
+   * cents) flat. The +5 is part of the total 1/64-semitone offset,
+   * so it joins the kf sum here and the normalisation below carries
+   * it into scale / octave exactly like any other offset.
+   * mdxKcToMidi subtracts the same +5 so pitch reports stay
+   * anchored to the nominal note. */
+  var kf = det.kf + porta.kf + lfo.kf + 5;
   var scaleExtra = det.scale + porta.scale + lfo.scale;
   var octExtra = det.oct + porta.oct + lfo.oct;
   scaleExtra += mdxFloorDiv(kf, 64);
@@ -3787,11 +3809,17 @@ MdxPlayer.prototype.pcmNativeInto = function (ym) {
  * index in the valid sequence is the semitone within the octave; the
  * KF fraction adds ((kf>>2)&63)/64 semitone. The +15 anchors the pair
  * to the reference chain's pitch: KC 0x3C (octave 3, code 12) sounds
- * as C4 = MIDI 60 (see the pitch check near YM_NOTE_TABLE above). */
+ * as C4 = MIDI 60 (see the pitch check near YM_NOTE_TABLE above).
+ * The fraction term subtracts 5 again: freqWrite writes every pair
+ * with MXDRV's +5 key correction included, and that correction is
+ * not part of the note's own pitch, so a plain note still reports
+ * exactly its nominal pitch (a detune reading of 0 cents); when the
+ * written fraction is below 5 the float sum borrows from the
+ * semitone on its own. */
 function mdxKcToMidi(kc, kfReg) {
   var code = kc & 0x0F;
   var semi = code - (code >= 3 ? 1 : 0) - (code >= 7 ? 1 : 0) - (code >= 11 ? 1 : 0) - (code >= 15 ? 1 : 0);
-  return (kc >> 4) * 12 + semi + 15 + ((kfReg >> 2) & 0x3F) / 64;
+  return (kc >> 4) * 12 + semi + 15 + (((kfReg >> 2) & 0x3F) - 5) / 64;
 }
 /* ------------------------------------------------- channel trace (v25) ---
  * Report-only history for the channel analysis panel: every tick,
