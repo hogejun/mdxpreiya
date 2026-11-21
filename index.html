@@ -2090,18 +2090,22 @@ MdxPlayer.prototype.parseEvent = function (t) {
     case 0xE8: /* PCM8 mode marker */
       return 0;
     case 0xE7: { /* MXDRV extension command: dispatch on the 2nd
-      * byte (mxdrv.cpp L001694, branch table L0016aa). Only
-      * subcommand 01 is a fade-out; 00 / 02 / 03-06 belong to
-      * extended MXDRV (+16 series) songs and must never start a
-      * fade. The old code treated every subcommand as a fade
-      * (00 discarded one byte and started a speed-5 fade), which
-      * both faded songs that should not fade and, for 02, left
-      * the parse position desynchronised by 5 bytes. */
+      * byte (mxdrv.cpp L001694, branch table L0016aa); the
+      * pre-dispatch test (cmp.w #$0007 / bcc L001442) sends every
+      * value >= 07 to the same track end as 00. Only subcommand
+      * 01 is a fade-out; the rest belong to extended MXDRV (+16
+      * series) songs and must never start a fade. The old code
+      * treated every subcommand as a fade (00 discarded one byte
+      * and started a speed-5 fade), which both faded songs that
+      * should not fade and, for 02, left the parse position
+      * desynchronised by 5 bytes. */
       var b1 = d[t.ptr++];
-      if (b1 === 0x00) {
+      if (b1 === 0x00 || b1 >= 0x07) {
         /* Track end (L001442), no extra operand: key off and end
          * this track only, exactly like the F1 data-end marker.
-         * Other tracks keep playing and no fade starts. */
+         * Other tracks keep playing and no fade starts. Values
+         * >= 07 land here too, per the pre-dispatch test above —
+         * they are NOT ignored. */
         this.noteOff(t); return -1;
       }
       if (b1 === 0x01) {
@@ -2121,16 +2125,88 @@ MdxPlayer.prototype.parseEvent = function (t) {
          * position stays in sync, and do not start a fade. */
         t.ptr += 6; return 0;
       }
-      if (b1 >= 0x03 && b1 <= 0x06) {
-        /* Flag settings etc., 1 operand byte each. The semantics
-         * are NOT implemented; skip the operand and do not start
-         * a fade. */
-        t.ptr++; return 0;
+      if (b1 === 0x04) {
+        /* Execute one event on another channel (L00170e): a
+         * channel byte, then ONE event — a note (2 bytes), a rest
+         * (1 byte) or any command with its operands, so the length
+         * varies — read from THIS track's data stream but applied
+         * to the target channel's state. The channel byte indexes
+         * this.tracks directly, like the EF sync-send operand.
+         * The event's bytes are consumed from this stream, but its
+         * length is charged to the TARGET track's counter, so this
+         * track's own time does not advance and this handler
+         * returns 0. Implemented by lending the target this
+         * track's stream position for one parseEvent call and
+         * restoring the target's own position afterwards; a target
+         * equal to this track is a plain recursive call (the event
+         * then charges this track, as usual), and a nested E7 04
+         * inside the event recurses the same way. If the charge
+         * lands on a track that is itself executing further up the
+         * call chain (tracked in this._e7Chain), it is passed up
+         * as a marker object and the frame owning that track
+         * returns it as its own result, so the tick loop charges
+         * the right track. An out-of-range channel byte is an
+         * error, handled like the undefined opcodes below. */
+        var ch = d[t.ptr++];
+        var target = (ch !== undefined && ch < this.tracks.length) ? this.tracks[ch] : null;
+        if (!target) {
+          this.errors.push({ track: t.idx, offset: cmdPos, opcode: b, tick: this.tickCount });
+          this.noteOff(t);
+          return -1;
+        }
+        if (target === t) return this.parseEvent(t);
+        if (!this._e7Chain) this._e7Chain = [];
+        this._e7Chain.push(t);
+        var savedPtr = target.ptr;
+        target.ptr = t.ptr;
+        var r = this.parseEvent(target);
+        t.ptr = target.ptr;
+        target.ptr = savedPtr;
+        this._e7Chain.pop();
+        if (r !== null && typeof r === 'object') {
+          /* A charge destined for a track further up the chain:
+           * if it is this track, return it as this track's own
+           * parse result; otherwise pass the marker up unchanged. */
+          if (r.track === t) return r.value;
+          return r;
+        }
+        if (r < 0) {
+          if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: -1 };
+          target.counter = -1; return 0;
+        }
+        if (r > 0) {
+          if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: r };
+          target.counter = r;
+        }
+        return 0;
       }
-      /* Subcommands above 06 are not in MXDRV's branch table:
-       * no extra operand is defined, so ignore the command as-is
+      if (b1 === 0x05) {
+        /* Note-length command (L00178a): the operand nn is a
+         * length — gate and length are both nn + 1 — the track
+         * keys on at its CURRENT pitch, and parsing stops there
+         * for nn + 1 ticks. The current pitch is the track's last
+         * note (t.note, the value the pitch report reads), passed
+         * to noteOn as usual; the gate is then set to nn + 1
+         * directly, because noteOn derives the gate from the @q
+         * setting while MXDRV sets it outright. If no note has
+         * sounded yet on this track (t.note < 0) there is no
+         * current pitch in the engine's state — freqWrite itself
+         * refuses note < 0 — so only the timing is taken: the
+         * gate is armed with nn + 1 and nothing keys on. */
+        var nn = d[t.ptr++];
+        if (nn === undefined) nn = 0;
+        if (t.note >= 0) {
+          this.noteOn(t, t.note, nn + 1);
+          t.gate = nn + 1;
+        } else {
+          t.gate = nn + 1;
+        }
+        return nn + 1;
+      }
+      /* Only 03 / 06 reach here: flag settings, 1 operand byte
+       * each. The semantics are NOT implemented; skip the operand
        * and do not start a fade. */
-      return 0;
+      t.ptr++; return 0;
     }
     default: /* 0xE0..0xE6 undefined */
       this.errors.push({ track: t.idx, offset: cmdPos, opcode: b, tick: this.tickCount });
@@ -3934,18 +4010,22 @@ MdxPlayer.prototype.parseEvent = function (t) {
     case 0xE8: /* PCM8 mode marker */
       return 0;
     case 0xE7: { /* MXDRV extension command: dispatch on the 2nd
-      * byte (mxdrv.cpp L001694, branch table L0016aa). Only
-      * subcommand 01 is a fade-out; 00 / 02 / 03-06 belong to
-      * extended MXDRV (+16 series) songs and must never start a
-      * fade. The old code treated every subcommand as a fade
-      * (00 discarded one byte and started a speed-5 fade), which
-      * both faded songs that should not fade and, for 02, left
-      * the parse position desynchronised by 5 bytes. */
+      * byte (mxdrv.cpp L001694, branch table L0016aa); the
+      * pre-dispatch test (cmp.w #$0007 / bcc L001442) sends every
+      * value >= 07 to the same track end as 00. Only subcommand
+      * 01 is a fade-out; the rest belong to extended MXDRV (+16
+      * series) songs and must never start a fade. The old code
+      * treated every subcommand as a fade (00 discarded one byte
+      * and started a speed-5 fade), which both faded songs that
+      * should not fade and, for 02, left the parse position
+      * desynchronised by 5 bytes. */
       var b1 = d[t.ptr++];
-      if (b1 === 0x00) {
+      if (b1 === 0x00 || b1 >= 0x07) {
         /* Track end (L001442), no extra operand: key off and end
          * this track only, exactly like the F1 data-end marker.
-         * Other tracks keep playing and no fade starts. */
+         * Other tracks keep playing and no fade starts. Values
+         * >= 07 land here too, per the pre-dispatch test above —
+         * they are NOT ignored. */
         this.noteOff(t); return -1;
       }
       if (b1 === 0x01) {
@@ -3965,16 +4045,88 @@ MdxPlayer.prototype.parseEvent = function (t) {
          * position stays in sync, and do not start a fade. */
         t.ptr += 6; return 0;
       }
-      if (b1 >= 0x03 && b1 <= 0x06) {
-        /* Flag settings etc., 1 operand byte each. The semantics
-         * are NOT implemented; skip the operand and do not start
-         * a fade. */
-        t.ptr++; return 0;
+      if (b1 === 0x04) {
+        /* Execute one event on another channel (L00170e): a
+         * channel byte, then ONE event — a note (2 bytes), a rest
+         * (1 byte) or any command with its operands, so the length
+         * varies — read from THIS track's data stream but applied
+         * to the target channel's state. The channel byte indexes
+         * this.tracks directly, like the EF sync-send operand.
+         * The event's bytes are consumed from this stream, but its
+         * length is charged to the TARGET track's counter, so this
+         * track's own time does not advance and this handler
+         * returns 0. Implemented by lending the target this
+         * track's stream position for one parseEvent call and
+         * restoring the target's own position afterwards; a target
+         * equal to this track is a plain recursive call (the event
+         * then charges this track, as usual), and a nested E7 04
+         * inside the event recurses the same way. If the charge
+         * lands on a track that is itself executing further up the
+         * call chain (tracked in this._e7Chain), it is passed up
+         * as a marker object and the frame owning that track
+         * returns it as its own result, so the tick loop charges
+         * the right track. An out-of-range channel byte is an
+         * error, handled like the undefined opcodes below. */
+        var ch = d[t.ptr++];
+        var target = (ch !== undefined && ch < this.tracks.length) ? this.tracks[ch] : null;
+        if (!target) {
+          this.errors.push({ track: t.idx, offset: cmdPos, opcode: b, tick: this.tickCount });
+          this.noteOff(t);
+          return -1;
+        }
+        if (target === t) return this.parseEvent(t);
+        if (!this._e7Chain) this._e7Chain = [];
+        this._e7Chain.push(t);
+        var savedPtr = target.ptr;
+        target.ptr = t.ptr;
+        var r = this.parseEvent(target);
+        t.ptr = target.ptr;
+        target.ptr = savedPtr;
+        this._e7Chain.pop();
+        if (r !== null && typeof r === 'object') {
+          /* A charge destined for a track further up the chain:
+           * if it is this track, return it as this track's own
+           * parse result; otherwise pass the marker up unchanged. */
+          if (r.track === t) return r.value;
+          return r;
+        }
+        if (r < 0) {
+          if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: -1 };
+          target.counter = -1; return 0;
+        }
+        if (r > 0) {
+          if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: r };
+          target.counter = r;
+        }
+        return 0;
       }
-      /* Subcommands above 06 are not in MXDRV's branch table:
-       * no extra operand is defined, so ignore the command as-is
+      if (b1 === 0x05) {
+        /* Note-length command (L00178a): the operand nn is a
+         * length — gate and length are both nn + 1 — the track
+         * keys on at its CURRENT pitch, and parsing stops there
+         * for nn + 1 ticks. The current pitch is the track's last
+         * note (t.note, the value the pitch report reads), passed
+         * to noteOn as usual; the gate is then set to nn + 1
+         * directly, because noteOn derives the gate from the @q
+         * setting while MXDRV sets it outright. If no note has
+         * sounded yet on this track (t.note < 0) there is no
+         * current pitch in the engine's state — freqWrite itself
+         * refuses note < 0 — so only the timing is taken: the
+         * gate is armed with nn + 1 and nothing keys on. */
+        var nn = d[t.ptr++];
+        if (nn === undefined) nn = 0;
+        if (t.note >= 0) {
+          this.noteOn(t, t.note, nn + 1);
+          t.gate = nn + 1;
+        } else {
+          t.gate = nn + 1;
+        }
+        return nn + 1;
+      }
+      /* Only 03 / 06 reach here: flag settings, 1 operand byte
+       * each. The semantics are NOT implemented; skip the operand
        * and do not start a fade. */
-      return 0;
+      t.ptr++; return 0;
     }
     default: /* 0xE0..0xE6 undefined */
       this.errors.push({ track: t.idx, offset: cmdPos, opcode: b, tick: this.tickCount });
