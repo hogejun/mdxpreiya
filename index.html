@@ -1820,8 +1820,12 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
    * (@q operands with the high bit, stored here as q2). The previous
    * floor(count * q / 8) plus a conditional +1 keyed off one tick
    * late for some lengths at q < 8 and for every note at q2 >= 2.
-   * Legato notes keep their keyoff-disabling gate exactly as before. */
-  if (t.keyoffDisable) { t.gate = count + 2; t.keyoffDisable = false; }
+   * A legato note (flag up) arms the gate with the full length:
+   * the gate is frozen while the flag is up (see tick), so no
+   * padding is needed to keep the note from keying off before
+   * the next note arrives; the flag itself is left standing for
+   * tick to clear when the next parse session begins. */
+  if (t.keyoffDisable) t.gate = count;
   else if (t.q2 > 0) t.gate = Math.max(1, count - t.q2);
   else t.gate = Math.floor((count - 1) * t.q1 / 8) + 1;
   this.noteCounts[t.idx]++;
@@ -1881,21 +1885,16 @@ MdxPlayer.prototype.parseEvent = function (t) {
   var cmdPos = t.ptr;
   var b = d[t.ptr++];
   var v, word;
-  /* MXDRV clears the legato flag at the START of parsing every
-   * command (mxdrv.cpp:7650): whatever command is parsed after an
-   * F7 — a rest, a volume / pan / voice change, a repeat jump,
-   * anything — consumes the flag, and only a note parsed
-   * immediately after the F7 sees it. Snapshot the flag here and
-   * clear it unconditionally; the note branch below hands the
-   * snapshot back so noteOn applies the legato gate exactly as
-   * before, while every other command (rests included) simply
-   * drops it. (Carrying the flag over to the next note instead —
-   * the original behaviour, and still the behaviour for non-rest
-   * commands after a rest-only fix — made that note legato by
-   * mistake: it never keyed off and swallowed the note after it,
-   * the PCM legato retrigger drop.) */
-  var legatoPending = t.keyoffDisable;
-  t.keyoffDisable = false;
+  /* The legato (keyoff-disable) flag is NOT cleared here: MXDRV
+   * clears it once per parse session, in tick, just before the
+   * parse loop is entered (see tick). Commands parsed after an
+   * F7 within the same session — volume, pan, voice, anything —
+   * leave it up, so the next note is legato; a note parsed in a
+   * LATER session is unaffected by the F7, because tick cleared
+   * the flag when that session began. (An F7 followed by a rest
+   * ends its session at the rest, so the note after the rest is
+   * a normal note — the behaviour that fixed the PCM legato
+   * retrigger drop.) */
   if (b < 0x80) { /* rest */
     var count = b + 1;
     /* MXDRV also sustains a still-sounding note to the END of a rest
@@ -1911,10 +1910,9 @@ MdxPlayer.prototype.parseEvent = function (t) {
   }
   if (b < 0xE0) { /* note */
     var len = d[t.ptr++];
-    /* A note immediately after the F7 is the one legato case:
-     * restore the snapshot taken at entry so noteOn sees the flag.
-     * Any command in between has already consumed it above. */
-    t.keyoffDisable = legatoPending;
+    /* The flag is read as-is: if an F7 was parsed earlier in
+     * this session (with any number of other commands between),
+     * this note is legato, and noteOn sees the flag directly. */
     this.noteOn(t, b - 0x80, len + 1);
     return len + 1;
   }
@@ -2119,10 +2117,14 @@ MdxPlayer.prototype.tick = function () {
     var t = this.tracks[i];
     if (t.waiting) continue;
     if (t.counter < 0) continue;
-    t.gate--;
-    if (t.gate === 0) {
-      if (t.keyoffDisable) t.keyoffDisable = false;
-      else this.noteOff(t);
+    /* While the legato (keyoff-disable) flag is up, the gate is
+     * not decremented at all, as in MXDRV: the sounding note
+     * sustains across the F7 and through the legato note that
+     * follows it, and an F7 before a rest sustains past the rest's
+     * end instead of keying off there. */
+    if (!t.keyoffDisable) {
+      t.gate--;
+      if (t.gate === 0) this.noteOff(t);
     }
     if (t.isPCM) {
       /* F0 key-on delay: count down a pending PCM sample start (the
@@ -2151,6 +2153,14 @@ MdxPlayer.prototype.tick = function () {
     }
     t.counter--;
     var guard = 0;
+    /* MXDRV clears the legato flag exactly once when a track's
+     * length counter reaches 0 and parsing resumes (mxdrv.cpp
+     * L0011d4): the commands parsed inside the session loop back
+     * to L0011dc, past the clear, so an F7 followed by volume /
+     * voice / pan commands still makes the next note legato. The
+     * flag therefore lives from the F7 until the next length
+     * expires — it is NOT dropped per command. */
+    if (t.counter === 0) t.keyoffDisable = false;
     while (t.counter === 0 && !t.waiting && !this.ended) {
       var r = this.parseEvent(t);
       if (r < 0) { t.counter = -1; break; }
@@ -3591,8 +3601,12 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
    * (@q operands with the high bit, stored here as q2). The previous
    * floor(count * q / 8) plus a conditional +1 keyed off one tick
    * late for some lengths at q < 8 and for every note at q2 >= 2.
-   * Legato notes keep their keyoff-disabling gate exactly as before. */
-  if (t.keyoffDisable) { t.gate = count + 2; t.keyoffDisable = false; }
+   * A legato note (flag up) arms the gate with the full length:
+   * the gate is frozen while the flag is up (see tick), so no
+   * padding is needed to keep the note from keying off before
+   * the next note arrives; the flag itself is left standing for
+   * tick to clear when the next parse session begins. */
+  if (t.keyoffDisable) t.gate = count;
   else if (t.q2 > 0) t.gate = Math.max(1, count - t.q2);
   else t.gate = Math.floor((count - 1) * t.q1 / 8) + 1;
   this.noteCounts[t.idx]++;
@@ -3652,21 +3666,16 @@ MdxPlayer.prototype.parseEvent = function (t) {
   var cmdPos = t.ptr;
   var b = d[t.ptr++];
   var v, word;
-  /* MXDRV clears the legato flag at the START of parsing every
-   * command (mxdrv.cpp:7650): whatever command is parsed after an
-   * F7 — a rest, a volume / pan / voice change, a repeat jump,
-   * anything — consumes the flag, and only a note parsed
-   * immediately after the F7 sees it. Snapshot the flag here and
-   * clear it unconditionally; the note branch below hands the
-   * snapshot back so noteOn applies the legato gate exactly as
-   * before, while every other command (rests included) simply
-   * drops it. (Carrying the flag over to the next note instead —
-   * the original behaviour, and still the behaviour for non-rest
-   * commands after a rest-only fix — made that note legato by
-   * mistake: it never keyed off and swallowed the note after it,
-   * the PCM legato retrigger drop.) */
-  var legatoPending = t.keyoffDisable;
-  t.keyoffDisable = false;
+  /* The legato (keyoff-disable) flag is NOT cleared here: MXDRV
+   * clears it once per parse session, in tick, just before the
+   * parse loop is entered (see tick). Commands parsed after an
+   * F7 within the same session — volume, pan, voice, anything —
+   * leave it up, so the next note is legato; a note parsed in a
+   * LATER session is unaffected by the F7, because tick cleared
+   * the flag when that session began. (An F7 followed by a rest
+   * ends its session at the rest, so the note after the rest is
+   * a normal note — the behaviour that fixed the PCM legato
+   * retrigger drop.) */
   if (b < 0x80) { /* rest */
     var count = b + 1;
     /* MXDRV also sustains a still-sounding note to the END of a rest
@@ -3682,10 +3691,9 @@ MdxPlayer.prototype.parseEvent = function (t) {
   }
   if (b < 0xE0) { /* note */
     var len = d[t.ptr++];
-    /* A note immediately after the F7 is the one legato case:
-     * restore the snapshot taken at entry so noteOn sees the flag.
-     * Any command in between has already consumed it above. */
-    t.keyoffDisable = legatoPending;
+    /* The flag is read as-is: if an F7 was parsed earlier in
+     * this session (with any number of other commands between),
+     * this note is legato, and noteOn sees the flag directly. */
     this.noteOn(t, b - 0x80, len + 1);
     return len + 1;
   }
@@ -3890,10 +3898,14 @@ MdxPlayer.prototype.tick = function () {
     var t = this.tracks[i];
     if (t.waiting) continue;
     if (t.counter < 0) continue;
-    t.gate--;
-    if (t.gate === 0) {
-      if (t.keyoffDisable) t.keyoffDisable = false;
-      else this.noteOff(t);
+    /* While the legato (keyoff-disable) flag is up, the gate is
+     * not decremented at all, as in MXDRV: the sounding note
+     * sustains across the F7 and through the legato note that
+     * follows it, and an F7 before a rest sustains past the rest's
+     * end instead of keying off there. */
+    if (!t.keyoffDisable) {
+      t.gate--;
+      if (t.gate === 0) this.noteOff(t);
     }
     if (t.isPCM) {
       /* F0 key-on delay: count down a pending PCM sample start (the
@@ -3922,6 +3934,14 @@ MdxPlayer.prototype.tick = function () {
     }
     t.counter--;
     var guard = 0;
+    /* MXDRV clears the legato flag exactly once when a track's
+     * length counter reaches 0 and parsing resumes (mxdrv.cpp
+     * L0011d4): the commands parsed inside the session loop back
+     * to L0011dc, past the clear, so an F7 followed by volume /
+     * voice / pan commands still makes the next note legato. The
+     * flag therefore lives from the F7 until the next length
+     * expires — it is NOT dropped per command. */
+    if (t.counter === 0) t.keyoffDisable = false;
     while (t.counter === 0 && !t.waiting && !this.ended) {
       var r = this.parseEvent(t);
       if (r < 0) { t.counter = -1; break; }
