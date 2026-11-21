@@ -2089,16 +2089,47 @@ MdxPlayer.prototype.parseEvent = function (t) {
       v = d[t.ptr++]; t.lfoDelay = v; return 0;
     case 0xE8: /* PCM8 mode marker */
       return 0;
-    case 0xE7: { /* fade-out */
+    case 0xE7: { /* MXDRV extension command: dispatch on the 2nd
+      * byte (mxdrv.cpp L001694, branch table L0016aa). Only
+      * subcommand 01 is a fade-out; 00 / 02 / 03-06 belong to
+      * extended MXDRV (+16 series) songs and must never start a
+      * fade. The old code treated every subcommand as a fade
+      * (00 discarded one byte and started a speed-5 fade), which
+      * both faded songs that should not fade and, for 02, left
+      * the parse position desynchronised by 5 bytes. */
       var b1 = d[t.ptr++];
-      if (b1 === 0) { t.ptr++; this.fadeSpeed = 5; }
-      else this.fadeSpeed = d[t.ptr++];
-      /* MXDRV (mxdrv.cpp L0016b8): the speed byte becomes the fade
-       * counter's reload value (L001e1e) and the fade is armed
-       * (L001e17 = SET). The attenuation (fadeAtten) is not reset
-       * here, and the counter is loaded from the speed on the
-       * first fade tick in tick(), not at parse time. */
-      this.fadeActive = true; this.fadeArmed = true;
+      if (b1 === 0x00) {
+        /* Track end (L001442), no extra operand: key off and end
+         * this track only, exactly like the F1 data-end marker.
+         * Other tracks keep playing and no fade starts. */
+        this.noteOff(t); return -1;
+      }
+      if (b1 === 0x01) {
+        /* Fade-out, 1 operand byte (speed).
+         * MXDRV (mxdrv.cpp L0016b8): the speed byte becomes the fade
+         * counter's reload value (L001e1e) and the fade is armed
+         * (L001e17 = SET). The attenuation (fadeAtten) is not reset
+         * here, and the counter is loaded from the speed on the
+         * first fade tick in tick(), not at parse time. */
+        this.fadeSpeed = d[t.ptr++];
+        this.fadeActive = true; this.fadeArmed = true;
+        return 0;
+      }
+      if (b1 === 0x02) {
+        /* PCM8 direct instruction, 6 operand bytes. The semantics
+         * are NOT implemented; skip all 6 operands so the parse
+         * position stays in sync, and do not start a fade. */
+        t.ptr += 6; return 0;
+      }
+      if (b1 >= 0x03 && b1 <= 0x06) {
+        /* Flag settings etc., 1 operand byte each. The semantics
+         * are NOT implemented; skip the operand and do not start
+         * a fade. */
+        t.ptr++; return 0;
+      }
+      /* Subcommands above 06 are not in MXDRV's branch table:
+       * no extra operand is defined, so ignore the command as-is
+       * and do not start a fade. */
       return 0;
     }
     default: /* 0xE0..0xE6 undefined */
@@ -3902,16 +3933,47 @@ MdxPlayer.prototype.parseEvent = function (t) {
       v = d[t.ptr++]; t.lfoDelay = v; return 0;
     case 0xE8: /* PCM8 mode marker */
       return 0;
-    case 0xE7: { /* fade-out */
+    case 0xE7: { /* MXDRV extension command: dispatch on the 2nd
+      * byte (mxdrv.cpp L001694, branch table L0016aa). Only
+      * subcommand 01 is a fade-out; 00 / 02 / 03-06 belong to
+      * extended MXDRV (+16 series) songs and must never start a
+      * fade. The old code treated every subcommand as a fade
+      * (00 discarded one byte and started a speed-5 fade), which
+      * both faded songs that should not fade and, for 02, left
+      * the parse position desynchronised by 5 bytes. */
       var b1 = d[t.ptr++];
-      if (b1 === 0) { t.ptr++; this.fadeSpeed = 5; }
-      else this.fadeSpeed = d[t.ptr++];
-      /* MXDRV (mxdrv.cpp L0016b8): the speed byte becomes the fade
-       * counter's reload value (L001e1e) and the fade is armed
-       * (L001e17 = SET). The attenuation (fadeAtten) is not reset
-       * here, and the counter is loaded from the speed on the
-       * first fade tick in tick(), not at parse time. */
-      this.fadeActive = true; this.fadeArmed = true;
+      if (b1 === 0x00) {
+        /* Track end (L001442), no extra operand: key off and end
+         * this track only, exactly like the F1 data-end marker.
+         * Other tracks keep playing and no fade starts. */
+        this.noteOff(t); return -1;
+      }
+      if (b1 === 0x01) {
+        /* Fade-out, 1 operand byte (speed).
+         * MXDRV (mxdrv.cpp L0016b8): the speed byte becomes the fade
+         * counter's reload value (L001e1e) and the fade is armed
+         * (L001e17 = SET). The attenuation (fadeAtten) is not reset
+         * here, and the counter is loaded from the speed on the
+         * first fade tick in tick(), not at parse time. */
+        this.fadeSpeed = d[t.ptr++];
+        this.fadeActive = true; this.fadeArmed = true;
+        return 0;
+      }
+      if (b1 === 0x02) {
+        /* PCM8 direct instruction, 6 operand bytes. The semantics
+         * are NOT implemented; skip all 6 operands so the parse
+         * position stays in sync, and do not start a fade. */
+        t.ptr += 6; return 0;
+      }
+      if (b1 >= 0x03 && b1 <= 0x06) {
+        /* Flag settings etc., 1 operand byte each. The semantics
+         * are NOT implemented; skip the operand and do not start
+         * a fade. */
+        t.ptr++; return 0;
+      }
+      /* Subcommands above 06 are not in MXDRV's branch table:
+       * no extra operand is defined, so ignore the command as-is
+       * and do not start a fade. */
       return 0;
     }
     default: /* 0xE0..0xE6 undefined */
