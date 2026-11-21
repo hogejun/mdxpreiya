@@ -1476,7 +1476,9 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.lfoDelay = 0; this.lfoDelayCnt = 0; /* shared E9 delay (MXDRV S0024/S0025) */
   this.hwLfo = { on: false, wave: 0, sync: false, pmsams: 0 };
   /* PCM state */
-  this.pcmPlaying = false; this.pcmPos = 0; this.pcmData = null;
+  this.pcmPlaying = false; this.pcmKeyOn = false; this.pcmPos = 0; this.pcmData = null;
+  /* pcmKeyOn: MXDRV-style key-on state for the PCM retrigger test;
+   * noteOff clears it, a sample ending naturally does not. */
   this.pcmRate = 15600; this.pcmRawMode = false; this.pcmLevel = 0;
   this.pcmVolIndex = 8; /* MXDRV v-index for the PCM8 volume table (default v8) */
   /* X68Sound Pcm8 per-voice output-filter state (62.5 kHz domain) */
@@ -1671,7 +1673,7 @@ MdxPlayer.prototype.setMuteSolo = function (mute, solo) {
   for (var i = 0; i < this.tracks.length; i++) {
     var t = this.tracks[i];
     if (!this._chSilent(t)) continue;
-    if (t.isPCM) { t.pcmPlaying = false; t.pcmData = null; }
+    if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.pcmData = null; }
     else if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
   }
 };
@@ -1758,7 +1760,13 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
     var bank = t.voiceNum & 0x0F;
     if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
     this.pcmUsage[bank].add(noteNum);
-    if (!t.pcmPlaying && this.pcmPan !== 0 && !this._chSilent(t)) {
+    /* MXDRV judges a PCM retrigger by the key-on state, not by
+     * whether the previous sample is still sounding: a note that
+     * arrives while the channel is still keyed on (the previous
+     * note was legato-extended, or its sample ended naturally
+     * before its gate) does not restart the sample. */
+    if (!t.pcmKeyOn && this.pcmPan !== 0 && !this._chSilent(t)) {
+      t.pcmKeyOn = true;
       var data = null;
       if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, bank, noteNum) : pdxDecodeTone(this.pdx, bank, noteNum);
       if (data && data.length > 0) {
@@ -1798,7 +1806,7 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
   }
 };
 MdxPlayer.prototype.noteOff = function (t) {
-  if (t.isPCM) { t.pcmPlaying = false; return; }
+  if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; return; }
   if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
   t.portamento = 0;
 };
@@ -1818,14 +1826,40 @@ MdxPlayer.prototype.parseEvent = function (t) {
   var cmdPos = t.ptr;
   var b = d[t.ptr++];
   var v, word;
+  /* MXDRV clears the legato flag at the START of parsing every
+   * command (mxdrv.cpp:7650): whatever command is parsed after an
+   * F7 — a rest, a volume / pan / voice change, a repeat jump,
+   * anything — consumes the flag, and only a note parsed
+   * immediately after the F7 sees it. Snapshot the flag here and
+   * clear it unconditionally; the note branch below hands the
+   * snapshot back so noteOn applies the legato gate exactly as
+   * before, while every other command (rests included) simply
+   * drops it. (Carrying the flag over to the next note instead —
+   * the original behaviour, and still the behaviour for non-rest
+   * commands after a rest-only fix — made that note legato by
+   * mistake: it never keyed off and swallowed the note after it,
+   * the PCM legato retrigger drop.) */
+  var legatoPending = t.keyoffDisable;
+  t.keyoffDisable = false;
   if (b < 0x80) { /* rest */
-    this.noteOff(t);
     var count = b + 1;
-    t.gate = count + 1;
+    /* MXDRV also sustains a still-sounding note to the END of a rest
+     * instead of keying off at the rest's start. Only a legato note
+     * can still be on here (any other note's gate has already expired
+     * by the rest's first tick), so when the channel is still keyed
+     * on, defer the key-off to the tick the rest ends by arming the
+     * gate with the rest length: the tick loop keys off as the gate
+     * hits 0, just before the next event is parsed. */
+    if (t.isPCM ? t.pcmKeyOn : t.keyOn) t.gate = count;
+    else { this.noteOff(t); t.gate = count + 1; }
     return count;
   }
   if (b < 0xE0) { /* note */
     var len = d[t.ptr++];
+    /* A note immediately after the F7 is the one legato case:
+     * restore the snapshot taken at entry so noteOn sees the flag.
+     * Any command in between has already consumed it above. */
+    t.keyoffDisable = legatoPending;
     this.noteOn(t, b - 0x80, len + 1);
     return len + 1;
   }
@@ -3136,7 +3170,9 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.lfoDelay = 0; this.lfoDelayCnt = 0; /* shared E9 delay (MXDRV S0024/S0025) */
   this.hwLfo = { on: false, wave: 0, sync: false, pmsams: 0 };
   /* PCM state */
-  this.pcmPlaying = false; this.pcmPos = 0; this.pcmData = null;
+  this.pcmPlaying = false; this.pcmKeyOn = false; this.pcmPos = 0; this.pcmData = null;
+  /* pcmKeyOn: MXDRV-style key-on state for the PCM retrigger test;
+   * noteOff clears it, a sample ending naturally does not. */
   this.pcmRate = 15600; this.pcmRawMode = false; this.pcmLevel = 0;
   this.pcmVolIndex = 8; /* MXDRV v-index for the PCM8 volume table (default v8) */
   /* X68Sound Pcm8 per-voice output-filter state (62.5 kHz domain) */
@@ -3331,7 +3367,7 @@ MdxPlayer.prototype.setMuteSolo = function (mute, solo) {
   for (var i = 0; i < this.tracks.length; i++) {
     var t = this.tracks[i];
     if (!this._chSilent(t)) continue;
-    if (t.isPCM) { t.pcmPlaying = false; t.pcmData = null; }
+    if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.pcmData = null; }
     else if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
   }
 };
@@ -3418,7 +3454,13 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
     var bank = t.voiceNum & 0x0F;
     if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
     this.pcmUsage[bank].add(noteNum);
-    if (!t.pcmPlaying && this.pcmPan !== 0 && !this._chSilent(t)) {
+    /* MXDRV judges a PCM retrigger by the key-on state, not by
+     * whether the previous sample is still sounding: a note that
+     * arrives while the channel is still keyed on (the previous
+     * note was legato-extended, or its sample ended naturally
+     * before its gate) does not restart the sample. */
+    if (!t.pcmKeyOn && this.pcmPan !== 0 && !this._chSilent(t)) {
+      t.pcmKeyOn = true;
       var data = null;
       if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, bank, noteNum) : pdxDecodeTone(this.pdx, bank, noteNum);
       if (data && data.length > 0) {
@@ -3458,7 +3500,7 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
   }
 };
 MdxPlayer.prototype.noteOff = function (t) {
-  if (t.isPCM) { t.pcmPlaying = false; return; }
+  if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; return; }
   if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
   t.portamento = 0;
 };
@@ -3478,14 +3520,40 @@ MdxPlayer.prototype.parseEvent = function (t) {
   var cmdPos = t.ptr;
   var b = d[t.ptr++];
   var v, word;
+  /* MXDRV clears the legato flag at the START of parsing every
+   * command (mxdrv.cpp:7650): whatever command is parsed after an
+   * F7 — a rest, a volume / pan / voice change, a repeat jump,
+   * anything — consumes the flag, and only a note parsed
+   * immediately after the F7 sees it. Snapshot the flag here and
+   * clear it unconditionally; the note branch below hands the
+   * snapshot back so noteOn applies the legato gate exactly as
+   * before, while every other command (rests included) simply
+   * drops it. (Carrying the flag over to the next note instead —
+   * the original behaviour, and still the behaviour for non-rest
+   * commands after a rest-only fix — made that note legato by
+   * mistake: it never keyed off and swallowed the note after it,
+   * the PCM legato retrigger drop.) */
+  var legatoPending = t.keyoffDisable;
+  t.keyoffDisable = false;
   if (b < 0x80) { /* rest */
-    this.noteOff(t);
     var count = b + 1;
-    t.gate = count + 1;
+    /* MXDRV also sustains a still-sounding note to the END of a rest
+     * instead of keying off at the rest's start. Only a legato note
+     * can still be on here (any other note's gate has already expired
+     * by the rest's first tick), so when the channel is still keyed
+     * on, defer the key-off to the tick the rest ends by arming the
+     * gate with the rest length: the tick loop keys off as the gate
+     * hits 0, just before the next event is parsed. */
+    if (t.isPCM ? t.pcmKeyOn : t.keyOn) t.gate = count;
+    else { this.noteOff(t); t.gate = count + 1; }
     return count;
   }
   if (b < 0xE0) { /* note */
     var len = d[t.ptr++];
+    /* A note immediately after the F7 is the one legato case:
+     * restore the snapshot taken at entry so noteOn sees the flag.
+     * Any command in between has already consumed it above. */
+    t.keyoffDisable = legatoPending;
     this.noteOn(t, b - 0x80, len + 1);
     return len + 1;
   }
