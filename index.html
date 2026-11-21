@@ -953,10 +953,10 @@ function pdxToneRawPCM(pdx, bank, id) {
  * was tuned on. Only the operator pipeline itself (phase, EG, LFO,
  * noise, algorithm routing) is now ymfm's, replacing the previous
  * JavaScript re-implementation and its X68Sound EG/pitch tables.
- * Pitch check (2026-11-16): for the same key code the WASM core
- * sounds within measurement error of the calibrated JS core
- * (KC 0x3C: 260.4 Hz vs 261.6 Hz, i.e. C4), so no transposition is
- * applied anywhere.
+ * Pitch (v37): freqWrite applies MXDRV's +5 key correction (the
+ * X68000 4 MHz OPM correction — see freqWrite). With it, C4
+ * (KC 0x3C) measures 261.47 Hz, within 1 cent of the 261.6 Hz
+ * reference; uncorrected (2026-11-16) it measured 260.4 Hz.
  *
  * The MSM6258/PCM8 side stays in JavaScript (see pcmNativeInto);
  * the WASM OKIM6258 is not used.
@@ -2766,10 +2766,10 @@ function pdxToneRawPCM(pdx, bank, id) {
  * was tuned on. Only the operator pipeline itself (phase, EG, LFO,
  * noise, algorithm routing) is now ymfm's, replacing the previous
  * JavaScript re-implementation and its X68Sound EG/pitch tables.
- * Pitch check (2026-11-16): for the same key code the WASM core
- * sounds within measurement error of the calibrated JS core
- * (KC 0x3C: 260.4 Hz vs 261.6 Hz, i.e. C4), so no transposition is
- * applied anywhere.
+ * Pitch (v37): freqWrite applies MXDRV's +5 key correction (the
+ * X68000 4 MHz OPM correction — see freqWrite). With it, C4
+ * (KC 0x3C) measures 261.47 Hz, within 1 cent of the 261.6 Hz
+ * reference; uncorrected (2026-11-16) it measured 260.4 Hz.
  *
  * The MSM6258/PCM8 side stays in JavaScript (see pcmNativeInto);
  * the WASM OKIM6258 is not used.
