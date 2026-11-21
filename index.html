@@ -1506,6 +1506,11 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.hwLfo = { on: false, wave: 0, sync: false, pmsams: 0 };
   /* PCM state */
   this.pcmPlaying = false; this.pcmKeyOn = false; this.pcmPos = 0; this.pcmData = null;
+  /* pcmSampleNum: the PDX sample number the last PCM note-on
+   * actually addressed (key-value derived — see mdxPcmSampleNum);
+   * -1 until the track's first note. Report-only (the @n display
+   * for PCM tracks and the PDX usage record read it). */
+  this.pcmSampleNum = -1;
   /* pcmKeyOn: MXDRV-style key-on state for the PCM retrigger test;
    * noteOff clears it, a sample ending naturally does not. */
   this.pcmRate = 15600; this.pcmRawMode = false; this.pcmLevel = 0;
@@ -1537,7 +1542,7 @@ function MdxPlayer(sampleRate) {
   this.errors = [];
   this.noteCounts = [];
   this.trace = []; /* v25: per-track pitch/volume ring buffers (report-only, see _tracePush) */
-  this.pcmUsage = {}; /* bank -> Set of tone ids */
+  this.pcmUsage = {}; /* bank (always 0: normal ADPCM reads only the first bank) -> Set of sounded sample numbers */
   this.samplesToNextTick = 0;
   this.started = false;
 }
@@ -1811,8 +1816,29 @@ MdxPlayer.prototype._lfoDelayReload = function (t) {
  * so an armed F0 key-on delay can defer exactly this part: the
  * retrigger test, the key-on flag and the sample load all belong to
  * the moment the sample actually starts, as in MXDRV). */
+/* The PDX sample number a PCM note addresses, taken from the
+ * note's key value exactly as MXDRV does (L000e7e): S0012 =
+ * (note << 6) + 5 + detune — the same +5 key correction and F3
+ * detune the FM side folds into its pitch — and the sample
+ * number is S0012 >> 6 (arithmetic shift). A detune that pushes
+ * (5 + detune) across a 64 boundary therefore shifts the sample
+ * number by one, just as it shifts the FM pitch by a semitone
+ * step there. An out-of-range result simply finds no PDX entry
+ * and the note stays silent, as before. */
+function mdxPcmSampleNum(noteNum, detune) {
+  return ((noteNum << 6) + 5 + detune) >> 6;
+}
 MdxPlayer.prototype._pcmStart = function (t, noteNum) {
-  var bank = t.voiceNum & 0x0F;
+  /* The @ value (t.voiceNum) plays no part in this lookup. On a
+   * PCM channel MXDRV's FD handler merely stores the operand
+   * byte verbatim (S0004_b); the stored value is read back as a
+   * bank (entry index = sample + @ * 96) only in PCM8 mode,
+   * which this player does not implement. In normal ADPCM the
+   * sample always comes from the PDX's first bank. (The player
+   * previously passed voiceNum & 0x0F as a parsePDX bank index,
+   * so on a single-bank PDX any PCM @n with n > 0 silenced the
+   * rest of the track — one song after its FD 04 at tick 433.) */
+  var sampleNum = mdxPcmSampleNum(noteNum, t.detune);
   /* MXDRV judges a PCM retrigger by the key-on state, not by
    * whether the previous sample is still sounding: a note that
    * arrives while the channel is still keyed on (the previous
@@ -1821,7 +1847,7 @@ MdxPlayer.prototype._pcmStart = function (t, noteNum) {
   if (!t.pcmKeyOn && this.pcmPan !== 0 && !this._chSilent(t)) {
     t.pcmKeyOn = true;
     var data = null;
-    if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, bank, noteNum) : pdxDecodeTone(this.pdx, bank, noteNum);
+    if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, 0, sampleNum) : pdxDecodeTone(this.pdx, 0, sampleNum);
     if (data && data.length > 0) {
       t.pcmData = data; t.pcmPos = 0; t.pcmPlaying = true;
       t.pcmInpPrev = 0; t.pcmF1 = 0; t.pcmF1Prev = 0; t.pcmF2 = 0; /* Pcm8::Reset */
@@ -1859,9 +1885,14 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
   this.noteCounts[t.idx]++;
   if (t.isPCM) {
     t.note = noteNum; /* remembered for the getState pitch report */
-    var bank = t.voiceNum & 0x0F;
-    if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
-    this.pcmUsage[bank].add(noteNum);
+    /* Usage record: the sample number this note-on actually
+     * addresses — the key-value-derived number _pcmStart looks
+     * up, in the first bank (the only bank normal ADPCM reads;
+     * see _pcmStart). Report-only. */
+    var sampleNum = mdxPcmSampleNum(noteNum, t.detune);
+    t.pcmSampleNum = sampleNum;
+    if (!this.pcmUsage[0]) this.pcmUsage[0] = new Set();
+    this.pcmUsage[0].add(sampleNum);
     if (!t.pcmKeyOn) {
       /* With an F0 key-on delay armed, the sample start itself is
        * deferred (see tick): the pending note replaces any earlier
@@ -1955,10 +1986,17 @@ MdxPlayer.prototype.parseEvent = function (t) {
       if (reg === 0x12 && val >= 2) this.tempo = val;
       return 0;
     }
-    case 0xFD: /* voice (FM) / bank (PCM) */
+    case 0xFD: /* voice (FM) / @ value (PCM) */
       v = d[t.ptr++];
-      if (t.isPCM) { if (v < 16) t.voiceNum = v; }
-      else { t.voiceNum = v; t.voiceDirty = true; }
+      /* PCM: MXDRV's FD handler (L0012e0) stores the operand
+       * byte verbatim in S0004_b — no range check, no flags —
+       * so the full byte is kept here too (values >= 16 are no
+       * longer dropped). The stored value is state only: normal
+       * ADPCM never reads it back (see _pcmStart); only a PCM8
+       * mode, not implemented, would use it as a bank. FM: the
+       * voice number, applied by applyVoice as before. */
+      t.voiceNum = v;
+      if (!t.isPCM) t.voiceDirty = true;
       return 0;
     case 0xFC: /* pan */
       v = d[t.ptr++];
@@ -2248,9 +2286,10 @@ MdxPlayer.prototype.parseEvent = function (t) {
            * key-on exactly like a normal note's. */
           this.noteCounts[t.idx]++;
           if (t.isPCM) {
-            var bank = t.voiceNum & 0x0F;
-            if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
-            this.pcmUsage[bank].add(t.note);
+            var sampleNum = mdxPcmSampleNum(t.note, t.detune);
+            t.pcmSampleNum = sampleNum;
+            if (!this.pcmUsage[0]) this.pcmUsage[0] = new Set();
+            this.pcmUsage[0].add(sampleNum);
             if (!t.pcmKeyOn) this._pcmStart(t, t.note);
           } else if (!t.keyOn && t.pan !== 0 && !this._chSilent(t)) {
             this.ym.write(0x08, ((t.slotMask & 0x0F) << 3) | t.idx);
@@ -2566,11 +2605,14 @@ MdxPlayer.prototype.getState = function () {
        * sample sounds (no pitch bend applies to PCM playback) —
        * the same convention as S98Player's PCM keyboard rows. */
       notes.push(t.pcmPlaying && t.note >= 0 ? t.note + 15 : null);
-      /* PCM voice report: for PCM tracks the note value itself
-       * selects the PDX tone (within the bank chosen by FD), so
-       * the last note-on's sample number is the PCM equivalent
-       * of @n. Null until the track's first note. Report-only. */
-      voices.push(t.note >= 0 ? t.note : null);
+      /* PCM voice report: the PDX sample number the last
+       * note-on actually addressed — derived from the note's
+       * key value (note, +5 correction and detune; see
+       * mdxPcmSampleNum), not from the @ value, which normal
+       * ADPCM stores but never reads. That number is the PCM
+       * equivalent of @n. Null until the track's first note (or
+       * while the derived number is out of range). Report-only. */
+      voices.push(t.pcmSampleNum >= 0 ? t.pcmSampleNum : null);
     } else {
       levels.push(this.ym.ch[i].peak || 0); keyOns.push(!!t.keyOn);
       /* FM pitch report: converted from the KC/KF pair actually
