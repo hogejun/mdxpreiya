@@ -2696,6 +2696,7 @@ if (typeof window !== 'undefined') window.MDXEngine = MDXEngine;
 
 
 
+/* @@WORKLET-ONLY@@ */
 /* AudioWorklet processor: hosts an MdxPlayer in the audio thread.
  * Loaded together with the engine source above it (single blob). */
 class MdxWorkletProcessor extends AudioWorkletProcessor {
@@ -2787,12 +2788,18 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * exactly as the deleted main-thread copy used to.
        * The glue itself (the worklet processor class and its
        * registerProcessor call) is worklet-only, not executed here.
+       * The cut point is the dedicated @@WORKLET-ONLY@@ marker
+       * line just before the glue (not the glue's prose comment),
+       * and the executed source ends with a
+       * sourceURL comment so main-thread engine errors show up as
+       * mdx-engine.js in devtools.
        * Inserting an inline script element runs it synchronously in global
        * scope, so MDXEngine is ready before the UI scripts below. */
       (function () {
         var full = document.getElementById('worklet-src').textContent;
-        var cut = full.indexOf('/* AudioWorklet processor:');
+        var cut = full.indexOf('/* @@WORKLET-ONLY@@ */');
         var src = cut >= 0 ? full.slice(0, cut) : full;
+        src += '\n//# sourceURL=mdx-engine.js';
         var s = document.createElement('script');
         s.textContent = src;
         document.currentScript.parentNode.insertBefore(s, document.currentScript);
