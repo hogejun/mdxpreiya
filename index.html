@@ -1470,6 +1470,10 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.loopDepth = 0; this.loopCounters = [];
   this.waiting = false; this.keyoffDisable = false;
   this.note = -1; this.keyOn = false;
+  /* F0 key-on delay (MXDRV S001f setting / S0020 countdown): each note
+   * copies the setting into the countdown and its key-on (FM) or sample
+   * start (PCM) is deferred until the countdown expires. */
+  this.keyOnDelay = 0; this.keyOnDelayCnt = 0; this.keyOnPending = false; this.pendingNote = -1;
   this.lastKc = -1; this.lastKf = -1;
   this.loopedOnce = false;
   this.pitchLfo = mdxNewLFO(); this.volLfo = mdxNewLFO();
@@ -1673,8 +1677,8 @@ MdxPlayer.prototype.setMuteSolo = function (mute, solo) {
   for (var i = 0; i < this.tracks.length; i++) {
     var t = this.tracks[i];
     if (!this._chSilent(t)) continue;
-    if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.pcmData = null; }
-    else if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
+    if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.pcmData = null; t.keyOnPending = false; }
+    else { t.keyOnPending = false; if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; } }
   }
 };
 MdxPlayer.prototype.tickSeconds = function () { return 256 * (256 - this.tempo) / 1000000; };
@@ -1703,18 +1707,30 @@ MdxPlayer.prototype.applyVoice = function (t) {
 };
 MdxPlayer.prototype.volumeWrite = function (t) {
   if (t.isPCM) return;
-  var master = MDX_MASTER_VOL_TABLE[this.fadeMaster & 0x7F];
-  var vol = t.volume;
-  /* MXDRV adds the volume LFO offset's high byte in the attenuation
-   * domain, i.e. it only ever pulls the volume down from nominal. */
-  vol -= (t.volLfo.offset >>> 8);
-  vol = mdxClamp(vol, 0, 127);
+  /* MXDRV computes carrier TLs additively (mxdrv.cpp L000dfe /
+   * L000e3e): TL = the voice's own TL + total attenuation, clamped to
+   * 127. The total attenuation is the sum of the volume attenuation
+   * (127 - volume; the v0-v15 table form and the direct form both
+   * reduce to this, via MDX_VOL_CONV and 255 - v respectively), the
+   * fade-out attenuation (127 - fadeMaster, so the E7 fade adds in
+   * the same domain instead of scaling through MDX_MASTER_VOL_TABLE)
+   * and the volume LFO offset's high byte (which only ever pulls the
+   * volume down from nominal). The previous mdxmini-style
+   * multiplicative form, 127 - floor(master * vol * (127 - voiceTL)
+   * / 127 / 127), agreed with this only for carriers whose voice TL
+   * is 0; every other carrier sounded louder by about
+   * attenuation * voiceTL / 127 TL steps (0.75 dB each), skewing
+   * multi-carrier balances — the main cause of the spectral
+   * distribution gap (e.g. one song's centroid). The PCM side does not
+   * pass through here (it returns above) and keeps its measured
+   * PCM8 volume path, fade factor included, unchanged. */
+  var atten = (127 - t.volume) + (127 - this.fadeMaster) + (t.volLfo.offset >>> 8);
+  atten = mdxClamp(atten, 0, 127);
   var ch = t.idx;
   for (var i = 0; i < 4; i++) {
     if (!t.isVolSet[i]) continue;
-    var v = Math.floor(master * vol * t.totalLevel[i] / 127 / 127);
-    v = mdxClamp(v, 0, 127);
-    this.ym.write(0x60 + ch + i * 8, 127 - v);
+    var tl = (127 - t.totalLevel[i]) + atten;
+    this.ym.write(0x60 + ch + i * 8, tl > 127 ? 127 : tl);
   }
 };
 MdxPlayer.prototype.freqWrite = function (t) {
@@ -1748,65 +1764,104 @@ MdxPlayer.prototype.freqWrite = function (t) {
 };
 
 /* ------------------------------------------------------------- note on/off */
-MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
-  /* gate time */
-  if (t.keyoffDisable) { t.gate = count + 2; t.keyoffDisable = false; }
-  else if (t.q2 > 0) t.gate = Math.max(1, count - t.q2);
-  else t.gate = Math.floor(count * t.q1 / 8);
-  if (t.gate + 1 < count) t.gate++;
-  this.noteCounts[t.idx]++;
-  if (t.isPCM) {
-    t.note = noteNum; /* remembered for the getState pitch report */
-    var bank = t.voiceNum & 0x0F;
-    if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
-    this.pcmUsage[bank].add(noteNum);
-    /* MXDRV judges a PCM retrigger by the key-on state, not by
-     * whether the previous sample is still sounding: a note that
-     * arrives while the channel is still keyed on (the previous
-     * note was legato-extended, or its sample ended naturally
-     * before its gate) does not restart the sample. */
-    if (!t.pcmKeyOn && this.pcmPan !== 0 && !this._chSilent(t)) {
-      t.pcmKeyOn = true;
-      var data = null;
-      if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, bank, noteNum) : pdxDecodeTone(this.pdx, bank, noteNum);
-      if (data && data.length > 0) {
-        t.pcmData = data; t.pcmPos = 0; t.pcmPlaying = true;
-        t.pcmInpPrev = 0; t.pcmF1 = 0; t.pcmF1Prev = 0; t.pcmF2 = 0; /* Pcm8::Reset */
-      } else {
-        t.pcmPlaying = false; t.pcmData = null;
-      }
-    }
-    return;
-  }
-  t.note = noteNum;
-  if (!t.keyOn) {
-    t.portaStep = 0;
-    /* MXDRV key-on: reload the shared LFO delay counter. While a delay
-     * is pending both LFO offsets are held at 0 and one countdown step
-     * is consumed immediately; with no delay the LFOs are left alone
-     * and free-run across notes. Tie notes skip this entirely. */
-    t.lfoDelayCnt = t.lfoDelay;
-    if (t.lfoDelayCnt !== 0) {
-      t.pitchLfo.offset = 0; t.volLfo.offset = 0;
-      t.lfoDelayCnt--;
-      if (t.lfoDelayCnt === 0) {
-        if (t.pitchLfo.on) mdxPitchLfoRestart(t.pitchLfo);
-        if (t.volLfo.on) mdxVolLfoRestart(t.volLfo);
-      }
+/* MXDRV key-on: reload the shared LFO delay counter. While a delay
+ * is pending both LFO offsets are held at 0 and one countdown step
+ * is consumed immediately; with no delay the LFOs are left alone
+ * and free-run across notes. Tie notes skip this entirely. */
+MdxPlayer.prototype._lfoDelayReload = function (t) {
+  t.lfoDelayCnt = t.lfoDelay;
+  if (t.lfoDelayCnt !== 0) {
+    t.pitchLfo.offset = 0; t.volLfo.offset = 0;
+    t.lfoDelayCnt--;
+    if (t.lfoDelayCnt === 0) {
+      if (t.pitchLfo.on) mdxPitchLfoRestart(t.pitchLfo);
+      if (t.volLfo.on) mdxVolLfoRestart(t.volLfo);
     }
   }
-  else if (t.portaStep !== 0) { t.portamento = 0; }
-  if (t.voiceDirty || t.appliedVoiceNum !== t.voiceNum) { this.applyVoice(t); t.voiceDirty = false; }
-  this.freqWrite(t);
-  this.volumeWrite(t);
+};
+/* Start a PCM sample now (the audible half of a PCM noteOn, split out
+ * so an armed F0 key-on delay can defer exactly this part: the
+ * retrigger test, the key-on flag and the sample load all belong to
+ * the moment the sample actually starts, as in MXDRV). */
+MdxPlayer.prototype._pcmStart = function (t, noteNum) {
+  var bank = t.voiceNum & 0x0F;
+  /* MXDRV judges a PCM retrigger by the key-on state, not by
+   * whether the previous sample is still sounding: a note that
+   * arrives while the channel is still keyed on (the previous
+   * note was legato-extended, or its sample ended naturally
+   * before its gate) does not restart the sample. */
+  if (!t.pcmKeyOn && this.pcmPan !== 0 && !this._chSilent(t)) {
+    t.pcmKeyOn = true;
+    var data = null;
+    if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, bank, noteNum) : pdxDecodeTone(this.pdx, bank, noteNum);
+    if (data && data.length > 0) {
+      t.pcmData = data; t.pcmPos = 0; t.pcmPlaying = true;
+      t.pcmInpPrev = 0; t.pcmF1 = 0; t.pcmF1Prev = 0; t.pcmF2 = 0; /* Pcm8::Reset */
+    } else {
+      t.pcmPlaying = false; t.pcmData = null;
+    }
+  }
+};
+/* Perform a deferred FM key-on (an armed F0 delay just expired in
+ * tick): the E9 LFO-delay reload and the key-on register write that
+ * noteOn performs immediately when no F0 delay is armed. */
+MdxPlayer.prototype._fmKeyOnFire = function (t) {
+  this._lfoDelayReload(t);
   if (!t.keyOn && t.pan !== 0 && !this._chSilent(t)) {
     this.ym.write(0x08, ((t.slotMask & 0x0F) << 3) | t.idx);
     t.keyOn = true;
     if (t.hwLfo.on && t.hwLfo.sync) { this.ym.write(0x01, 0x02); this.ym.write(0x01, 0x00); }
   }
 };
+MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
+  /* gate time: MXDRV derives the gate from the raw length byte
+   * L (= count - 1 here): floor(L * q / 8) + 1 for the ratio form
+   * (@q 0-8), count - q2 (at least 1) for the subtractive form
+   * (@q operands with the high bit, stored here as q2). The previous
+   * floor(count * q / 8) plus a conditional +1 keyed off one tick
+   * late for some lengths at q < 8 and for every note at q2 >= 2.
+   * Legato notes keep their keyoff-disabling gate exactly as before. */
+  if (t.keyoffDisable) { t.gate = count + 2; t.keyoffDisable = false; }
+  else if (t.q2 > 0) t.gate = Math.max(1, count - t.q2);
+  else t.gate = Math.floor((count - 1) * t.q1 / 8) + 1;
+  this.noteCounts[t.idx]++;
+  if (t.isPCM) {
+    t.note = noteNum; /* remembered for the getState pitch report */
+    var bank = t.voiceNum & 0x0F;
+    if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
+    this.pcmUsage[bank].add(noteNum);
+    if (!t.pcmKeyOn) {
+      /* With an F0 key-on delay armed, the sample start itself is
+       * deferred (see tick): the pending note replaces any earlier
+       * pending one, exactly like a fresh start while keyed off. */
+      if (t.keyOnDelay > 0) { t.keyOnPending = true; t.keyOnDelayCnt = t.keyOnDelay; t.pendingNote = noteNum; }
+      else { t.keyOnPending = false; this._pcmStart(t, noteNum); }
+    }
+    return;
+  }
+  t.note = noteNum;
+  if (!t.keyOn) {
+    t.portaStep = 0;
+    /* With an F0 key-on delay armed, the key-on (and its E9 LFO
+     * reload) is deferred until the countdown expires in tick;
+     * see _fmKeyOnFire. */
+    if (t.keyOnDelay > 0) { t.keyOnPending = true; t.keyOnDelayCnt = t.keyOnDelay; }
+    else { t.keyOnPending = false; this._lfoDelayReload(t); }
+  }
+  else if (t.portaStep !== 0) { t.portamento = 0; }
+  if (t.voiceDirty || t.appliedVoiceNum !== t.voiceNum) { this.applyVoice(t); t.voiceDirty = false; }
+  this.freqWrite(t);
+  this.volumeWrite(t);
+  if (!t.keyOn && !t.keyOnPending && t.pan !== 0 && !this._chSilent(t)) {
+    this.ym.write(0x08, ((t.slotMask & 0x0F) << 3) | t.idx);
+    t.keyOn = true;
+    if (t.hwLfo.on && t.hwLfo.sync) { this.ym.write(0x01, 0x02); this.ym.write(0x01, 0x00); }
+  }
+};
 MdxPlayer.prototype.noteOff = function (t) {
-  if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; return; }
+  /* A key-off also cancels a key-on still pending under F0 delay. */
+  if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.keyOnPending = false; return; }
+  t.keyOnPending = false;
   if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
   t.portamento = 0;
 };
@@ -1950,8 +2005,10 @@ MdxPlayer.prototype.parseEvent = function (t) {
       t.ptr = cmdPos + word + 3; this.loopCount++;
       return 0;
     }
-    case 0xF0: /* key-on delay: operand ignored */
-      t.ptr++; return 0;
+    case 0xF0: /* key-on delay (MXDRV S001f): a per-channel setting;
+      * every following note copies it into its key-on countdown
+      * (S0020) and sounds that many ticks late (see noteOn / tick). */
+      t.keyOnDelay = d[t.ptr++]; return 0;
     case 0xEF: /* sync send */
       v = d[t.ptr++];
       if (v < this.tracks.length) this.tracks[v].waiting = false;
@@ -2067,10 +2124,30 @@ MdxPlayer.prototype.tick = function () {
       if (t.keyoffDisable) t.keyoffDisable = false;
       else this.noteOff(t);
     }
-    if (!t.isPCM) {
+    if (t.isPCM) {
+      /* F0 key-on delay: count down a pending PCM sample start (the
+       * gate handling above may already have cancelled it via
+       * noteOff). A note parsed at tick T with delay n starts at
+       * tick T + n, as in MXDRV. */
+      if (t.keyOnPending) {
+        t.keyOnDelayCnt--;
+        if (t.keyOnDelayCnt <= 0) { t.keyOnPending = false; this._pcmStart(t, t.pendingNote); }
+      }
+    } else {
+      /* F0 key-on delay (MXDRV S0020): while the countdown runs, the
+       * key-on is deferred and the portamento / LFO advance stays
+       * frozen, as in MXDRV's LFO driver; the tick the countdown
+       * expires performs the key-on. Frequency / volume writes still
+       * run every tick, again as in MXDRV. */
+      var f0Delayed = false;
+      if (t.keyOnPending) {
+        t.keyOnDelayCnt--;
+        if (t.keyOnDelayCnt <= 0) { t.keyOnPending = false; this._fmKeyOnFire(t); }
+        else f0Delayed = true;
+      }
       this.freqWrite(t);
       this.volumeWrite(t);
-      t.portaStep++; mdxLfoDriver(t);
+      if (!f0Delayed) { t.portaStep++; mdxLfoDriver(t); }
     }
     t.counter--;
     var guard = 0;
@@ -3164,6 +3241,10 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.loopDepth = 0; this.loopCounters = [];
   this.waiting = false; this.keyoffDisable = false;
   this.note = -1; this.keyOn = false;
+  /* F0 key-on delay (MXDRV S001f setting / S0020 countdown): each note
+   * copies the setting into the countdown and its key-on (FM) or sample
+   * start (PCM) is deferred until the countdown expires. */
+  this.keyOnDelay = 0; this.keyOnDelayCnt = 0; this.keyOnPending = false; this.pendingNote = -1;
   this.lastKc = -1; this.lastKf = -1;
   this.loopedOnce = false;
   this.pitchLfo = mdxNewLFO(); this.volLfo = mdxNewLFO();
@@ -3367,8 +3448,8 @@ MdxPlayer.prototype.setMuteSolo = function (mute, solo) {
   for (var i = 0; i < this.tracks.length; i++) {
     var t = this.tracks[i];
     if (!this._chSilent(t)) continue;
-    if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.pcmData = null; }
-    else if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
+    if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.pcmData = null; t.keyOnPending = false; }
+    else { t.keyOnPending = false; if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; } }
   }
 };
 MdxPlayer.prototype.tickSeconds = function () { return 256 * (256 - this.tempo) / 1000000; };
@@ -3397,18 +3478,30 @@ MdxPlayer.prototype.applyVoice = function (t) {
 };
 MdxPlayer.prototype.volumeWrite = function (t) {
   if (t.isPCM) return;
-  var master = MDX_MASTER_VOL_TABLE[this.fadeMaster & 0x7F];
-  var vol = t.volume;
-  /* MXDRV adds the volume LFO offset's high byte in the attenuation
-   * domain, i.e. it only ever pulls the volume down from nominal. */
-  vol -= (t.volLfo.offset >>> 8);
-  vol = mdxClamp(vol, 0, 127);
+  /* MXDRV computes carrier TLs additively (mxdrv.cpp L000dfe /
+   * L000e3e): TL = the voice's own TL + total attenuation, clamped to
+   * 127. The total attenuation is the sum of the volume attenuation
+   * (127 - volume; the v0-v15 table form and the direct form both
+   * reduce to this, via MDX_VOL_CONV and 255 - v respectively), the
+   * fade-out attenuation (127 - fadeMaster, so the E7 fade adds in
+   * the same domain instead of scaling through MDX_MASTER_VOL_TABLE)
+   * and the volume LFO offset's high byte (which only ever pulls the
+   * volume down from nominal). The previous mdxmini-style
+   * multiplicative form, 127 - floor(master * vol * (127 - voiceTL)
+   * / 127 / 127), agreed with this only for carriers whose voice TL
+   * is 0; every other carrier sounded louder by about
+   * attenuation * voiceTL / 127 TL steps (0.75 dB each), skewing
+   * multi-carrier balances — the main cause of the spectral
+   * distribution gap (e.g. one song's centroid). The PCM side does not
+   * pass through here (it returns above) and keeps its measured
+   * PCM8 volume path, fade factor included, unchanged. */
+  var atten = (127 - t.volume) + (127 - this.fadeMaster) + (t.volLfo.offset >>> 8);
+  atten = mdxClamp(atten, 0, 127);
   var ch = t.idx;
   for (var i = 0; i < 4; i++) {
     if (!t.isVolSet[i]) continue;
-    var v = Math.floor(master * vol * t.totalLevel[i] / 127 / 127);
-    v = mdxClamp(v, 0, 127);
-    this.ym.write(0x60 + ch + i * 8, 127 - v);
+    var tl = (127 - t.totalLevel[i]) + atten;
+    this.ym.write(0x60 + ch + i * 8, tl > 127 ? 127 : tl);
   }
 };
 MdxPlayer.prototype.freqWrite = function (t) {
@@ -3442,65 +3535,104 @@ MdxPlayer.prototype.freqWrite = function (t) {
 };
 
 /* ------------------------------------------------------------- note on/off */
-MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
-  /* gate time */
-  if (t.keyoffDisable) { t.gate = count + 2; t.keyoffDisable = false; }
-  else if (t.q2 > 0) t.gate = Math.max(1, count - t.q2);
-  else t.gate = Math.floor(count * t.q1 / 8);
-  if (t.gate + 1 < count) t.gate++;
-  this.noteCounts[t.idx]++;
-  if (t.isPCM) {
-    t.note = noteNum; /* remembered for the getState pitch report */
-    var bank = t.voiceNum & 0x0F;
-    if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
-    this.pcmUsage[bank].add(noteNum);
-    /* MXDRV judges a PCM retrigger by the key-on state, not by
-     * whether the previous sample is still sounding: a note that
-     * arrives while the channel is still keyed on (the previous
-     * note was legato-extended, or its sample ended naturally
-     * before its gate) does not restart the sample. */
-    if (!t.pcmKeyOn && this.pcmPan !== 0 && !this._chSilent(t)) {
-      t.pcmKeyOn = true;
-      var data = null;
-      if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, bank, noteNum) : pdxDecodeTone(this.pdx, bank, noteNum);
-      if (data && data.length > 0) {
-        t.pcmData = data; t.pcmPos = 0; t.pcmPlaying = true;
-        t.pcmInpPrev = 0; t.pcmF1 = 0; t.pcmF1Prev = 0; t.pcmF2 = 0; /* Pcm8::Reset */
-      } else {
-        t.pcmPlaying = false; t.pcmData = null;
-      }
-    }
-    return;
-  }
-  t.note = noteNum;
-  if (!t.keyOn) {
-    t.portaStep = 0;
-    /* MXDRV key-on: reload the shared LFO delay counter. While a delay
-     * is pending both LFO offsets are held at 0 and one countdown step
-     * is consumed immediately; with no delay the LFOs are left alone
-     * and free-run across notes. Tie notes skip this entirely. */
-    t.lfoDelayCnt = t.lfoDelay;
-    if (t.lfoDelayCnt !== 0) {
-      t.pitchLfo.offset = 0; t.volLfo.offset = 0;
-      t.lfoDelayCnt--;
-      if (t.lfoDelayCnt === 0) {
-        if (t.pitchLfo.on) mdxPitchLfoRestart(t.pitchLfo);
-        if (t.volLfo.on) mdxVolLfoRestart(t.volLfo);
-      }
+/* MXDRV key-on: reload the shared LFO delay counter. While a delay
+ * is pending both LFO offsets are held at 0 and one countdown step
+ * is consumed immediately; with no delay the LFOs are left alone
+ * and free-run across notes. Tie notes skip this entirely. */
+MdxPlayer.prototype._lfoDelayReload = function (t) {
+  t.lfoDelayCnt = t.lfoDelay;
+  if (t.lfoDelayCnt !== 0) {
+    t.pitchLfo.offset = 0; t.volLfo.offset = 0;
+    t.lfoDelayCnt--;
+    if (t.lfoDelayCnt === 0) {
+      if (t.pitchLfo.on) mdxPitchLfoRestart(t.pitchLfo);
+      if (t.volLfo.on) mdxVolLfoRestart(t.volLfo);
     }
   }
-  else if (t.portaStep !== 0) { t.portamento = 0; }
-  if (t.voiceDirty || t.appliedVoiceNum !== t.voiceNum) { this.applyVoice(t); t.voiceDirty = false; }
-  this.freqWrite(t);
-  this.volumeWrite(t);
+};
+/* Start a PCM sample now (the audible half of a PCM noteOn, split out
+ * so an armed F0 key-on delay can defer exactly this part: the
+ * retrigger test, the key-on flag and the sample load all belong to
+ * the moment the sample actually starts, as in MXDRV). */
+MdxPlayer.prototype._pcmStart = function (t, noteNum) {
+  var bank = t.voiceNum & 0x0F;
+  /* MXDRV judges a PCM retrigger by the key-on state, not by
+   * whether the previous sample is still sounding: a note that
+   * arrives while the channel is still keyed on (the previous
+   * note was legato-extended, or its sample ended naturally
+   * before its gate) does not restart the sample. */
+  if (!t.pcmKeyOn && this.pcmPan !== 0 && !this._chSilent(t)) {
+    t.pcmKeyOn = true;
+    var data = null;
+    if (this.pdx) data = t.pcmRawMode ? pdxToneRawPCM(this.pdx, bank, noteNum) : pdxDecodeTone(this.pdx, bank, noteNum);
+    if (data && data.length > 0) {
+      t.pcmData = data; t.pcmPos = 0; t.pcmPlaying = true;
+      t.pcmInpPrev = 0; t.pcmF1 = 0; t.pcmF1Prev = 0; t.pcmF2 = 0; /* Pcm8::Reset */
+    } else {
+      t.pcmPlaying = false; t.pcmData = null;
+    }
+  }
+};
+/* Perform a deferred FM key-on (an armed F0 delay just expired in
+ * tick): the E9 LFO-delay reload and the key-on register write that
+ * noteOn performs immediately when no F0 delay is armed. */
+MdxPlayer.prototype._fmKeyOnFire = function (t) {
+  this._lfoDelayReload(t);
   if (!t.keyOn && t.pan !== 0 && !this._chSilent(t)) {
     this.ym.write(0x08, ((t.slotMask & 0x0F) << 3) | t.idx);
     t.keyOn = true;
     if (t.hwLfo.on && t.hwLfo.sync) { this.ym.write(0x01, 0x02); this.ym.write(0x01, 0x00); }
   }
 };
+MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
+  /* gate time: MXDRV derives the gate from the raw length byte
+   * L (= count - 1 here): floor(L * q / 8) + 1 for the ratio form
+   * (@q 0-8), count - q2 (at least 1) for the subtractive form
+   * (@q operands with the high bit, stored here as q2). The previous
+   * floor(count * q / 8) plus a conditional +1 keyed off one tick
+   * late for some lengths at q < 8 and for every note at q2 >= 2.
+   * Legato notes keep their keyoff-disabling gate exactly as before. */
+  if (t.keyoffDisable) { t.gate = count + 2; t.keyoffDisable = false; }
+  else if (t.q2 > 0) t.gate = Math.max(1, count - t.q2);
+  else t.gate = Math.floor((count - 1) * t.q1 / 8) + 1;
+  this.noteCounts[t.idx]++;
+  if (t.isPCM) {
+    t.note = noteNum; /* remembered for the getState pitch report */
+    var bank = t.voiceNum & 0x0F;
+    if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
+    this.pcmUsage[bank].add(noteNum);
+    if (!t.pcmKeyOn) {
+      /* With an F0 key-on delay armed, the sample start itself is
+       * deferred (see tick): the pending note replaces any earlier
+       * pending one, exactly like a fresh start while keyed off. */
+      if (t.keyOnDelay > 0) { t.keyOnPending = true; t.keyOnDelayCnt = t.keyOnDelay; t.pendingNote = noteNum; }
+      else { t.keyOnPending = false; this._pcmStart(t, noteNum); }
+    }
+    return;
+  }
+  t.note = noteNum;
+  if (!t.keyOn) {
+    t.portaStep = 0;
+    /* With an F0 key-on delay armed, the key-on (and its E9 LFO
+     * reload) is deferred until the countdown expires in tick;
+     * see _fmKeyOnFire. */
+    if (t.keyOnDelay > 0) { t.keyOnPending = true; t.keyOnDelayCnt = t.keyOnDelay; }
+    else { t.keyOnPending = false; this._lfoDelayReload(t); }
+  }
+  else if (t.portaStep !== 0) { t.portamento = 0; }
+  if (t.voiceDirty || t.appliedVoiceNum !== t.voiceNum) { this.applyVoice(t); t.voiceDirty = false; }
+  this.freqWrite(t);
+  this.volumeWrite(t);
+  if (!t.keyOn && !t.keyOnPending && t.pan !== 0 && !this._chSilent(t)) {
+    this.ym.write(0x08, ((t.slotMask & 0x0F) << 3) | t.idx);
+    t.keyOn = true;
+    if (t.hwLfo.on && t.hwLfo.sync) { this.ym.write(0x01, 0x02); this.ym.write(0x01, 0x00); }
+  }
+};
 MdxPlayer.prototype.noteOff = function (t) {
-  if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; return; }
+  /* A key-off also cancels a key-on still pending under F0 delay. */
+  if (t.isPCM) { t.pcmPlaying = false; t.pcmKeyOn = false; t.keyOnPending = false; return; }
+  t.keyOnPending = false;
   if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; }
   t.portamento = 0;
 };
@@ -3644,8 +3776,10 @@ MdxPlayer.prototype.parseEvent = function (t) {
       t.ptr = cmdPos + word + 3; this.loopCount++;
       return 0;
     }
-    case 0xF0: /* key-on delay: operand ignored */
-      t.ptr++; return 0;
+    case 0xF0: /* key-on delay (MXDRV S001f): a per-channel setting;
+      * every following note copies it into its key-on countdown
+      * (S0020) and sounds that many ticks late (see noteOn / tick). */
+      t.keyOnDelay = d[t.ptr++]; return 0;
     case 0xEF: /* sync send */
       v = d[t.ptr++];
       if (v < this.tracks.length) this.tracks[v].waiting = false;
@@ -3761,10 +3895,30 @@ MdxPlayer.prototype.tick = function () {
       if (t.keyoffDisable) t.keyoffDisable = false;
       else this.noteOff(t);
     }
-    if (!t.isPCM) {
+    if (t.isPCM) {
+      /* F0 key-on delay: count down a pending PCM sample start (the
+       * gate handling above may already have cancelled it via
+       * noteOff). A note parsed at tick T with delay n starts at
+       * tick T + n, as in MXDRV. */
+      if (t.keyOnPending) {
+        t.keyOnDelayCnt--;
+        if (t.keyOnDelayCnt <= 0) { t.keyOnPending = false; this._pcmStart(t, t.pendingNote); }
+      }
+    } else {
+      /* F0 key-on delay (MXDRV S0020): while the countdown runs, the
+       * key-on is deferred and the portamento / LFO advance stays
+       * frozen, as in MXDRV's LFO driver; the tick the countdown
+       * expires performs the key-on. Frequency / volume writes still
+       * run every tick, again as in MXDRV. */
+      var f0Delayed = false;
+      if (t.keyOnPending) {
+        t.keyOnDelayCnt--;
+        if (t.keyOnDelayCnt <= 0) { t.keyOnPending = false; this._fmKeyOnFire(t); }
+        else f0Delayed = true;
+      }
       this.freqWrite(t);
       this.volumeWrite(t);
-      t.portaStep++; mdxLfoDriver(t);
+      if (!f0Delayed) { t.portaStep++; mdxLfoDriver(t); }
     }
     t.counter--;
     var guard = 0;
