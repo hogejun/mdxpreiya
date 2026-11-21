@@ -1464,6 +1464,17 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.idx = idx; this.isPCM = isPCM;
   this.startPtr = startPtr; this.ptr = startPtr;
   this.counter = 1; this.gate = 1;
+  /* dead: set once the track has truly ended — the F1 data end, an
+   * E7 00 / >= 07 track end, an undefined opcode or an out-of-range
+   * E7 04 channel (error stop), the parse-loop runaway guard, the
+   * one-shot (loop disabled) second-pass F1 end, or endSong — via
+   * the counter = -1 paths in tick / parseEvent / endSong. Loop
+   * jumps (an F1 with a loop operand, F5 repeats, shared-data
+   * jumps) never set it. A dead track never parses its own data
+   * again, even when E7 04 charges it a length afterwards; see
+   * tick. Tracks are rebuilt by resetPlayback, so a reload /
+   * restart always starts with the flag down. */
+  this.dead = false;
   this.voiceNum = 0; this.voiceDirty = true;
   this.appliedVoiceNum = -1; this.appliedVoice = null;
   this.totalLevel = [0, 0, 0, 0];
@@ -2146,7 +2157,13 @@ MdxPlayer.prototype.parseEvent = function (t) {
          * as a marker object and the frame owning that track
          * returns it as its own result, so the tick loop charges
          * the right track. An out-of-range channel byte is an
-         * error, handled like the undefined opcodes below. */
+         * error, handled like the undefined opcodes below. The
+         * target's legato flag is cleared before the event runs
+         * (andi.b #$7b). Injecting into an already-ended track is
+         * allowed and sounds for the charged length; the target's
+         * dead flag (see tick) then keeps it from ever parsing
+         * past its own end marker — the equivalent of MXDRV's
+         * dummy-data pointer swap at L001442. */
         var ch = d[t.ptr++];
         var target = (ch !== undefined && ch < this.tracks.length) ? this.tracks[ch] : null;
         if (!target) {
@@ -2154,6 +2171,13 @@ MdxPlayer.prototype.parseEvent = function (t) {
           this.noteOff(t);
           return -1;
         }
+        /* MXDRV clears the TARGET channel's legato (F7) flag
+         * before executing the event (andi.b #$7b,$0016(a6)), so an
+         * injected note keys on normally even if the target was in
+         * a legato passage. This also covers the self-addressed
+         * path below: the target is this track itself there, and
+         * MXDRV drops its flag just the same. */
+        target.keyoffDisable = false;
         if (target === t) return this.parseEvent(t);
         if (!this._e7Chain) this._e7Chain = [];
         this._e7Chain.push(t);
@@ -2172,7 +2196,7 @@ MdxPlayer.prototype.parseEvent = function (t) {
         }
         if (r < 0) {
           if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: -1 };
-          target.counter = -1; return 0;
+          target.counter = -1; target.dead = true; return 0;
         }
         if (r > 0) {
           if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: r };
@@ -2185,10 +2209,11 @@ MdxPlayer.prototype.parseEvent = function (t) {
          * length — gate and length are both nn + 1 — the track
          * keys on at its CURRENT pitch, and parsing stops there
          * for nn + 1 ticks. The current pitch is the track's last
-         * note (t.note, the value the pitch report reads), passed
-         * to noteOn as usual; the gate is then set to nn + 1
-         * directly, because noteOn derives the gate from the @q
-         * setting while MXDRV sets it outright. If no note has
+         * note (t.note, the value the pitch report reads). The
+         * key-on is the DIRECT register write below (L000e7e), not
+         * the normal noteOn path, and the gate is set to nn + 1
+         * outright, because noteOn would derive it from the @q
+         * setting while MXDRV sets it directly. If no note has
          * sounded yet on this track (t.note < 0) there is no
          * current pitch in the engine's state — freqWrite itself
          * refuses note < 0 — so only the timing is taken: the
@@ -2196,7 +2221,33 @@ MdxPlayer.prototype.parseEvent = function (t) {
         var nn = d[t.ptr++];
         if (nn === undefined) nn = 0;
         if (t.note >= 0) {
-          this.noteOn(t, t.note, nn + 1);
+          /* Direct key-on (L00178a -> L000e7e): MXDRV writes only
+           * the key-on register here. Because the normal note path
+           * is bypassed, an armed F0 key-on delay does NOT defer
+           * this key-on and the E9 LFO delay is NOT reloaded; no
+           * frequency / volume / voice registers are written, and
+           * the hardware-LFO sync reset writes (which live in the
+           * normal note path) do not happen either. A key-on still
+           * waiting under an F0 delay is cancelled first (the
+           * pending flag is dropped), and a track that is already
+           * keyed on is left alone — no retrigger. On a PCM track
+           * the same direct path starts the sample for the current
+           * note number (L000e7e drives the PCM side too). */
+          t.keyOnPending = false;
+          /* The report-only bookkeeping the normal note path
+           * performs (the per-track note count, and on PCM the
+           * PDX usage set) is kept, so state reports see this
+           * key-on exactly like a normal note's. */
+          this.noteCounts[t.idx]++;
+          if (t.isPCM) {
+            var bank = t.voiceNum & 0x0F;
+            if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
+            this.pcmUsage[bank].add(t.note);
+            if (!t.pcmKeyOn) this._pcmStart(t, t.note);
+          } else if (!t.keyOn && t.pan !== 0 && !this._chSilent(t)) {
+            this.ym.write(0x08, ((t.slotMask & 0x0F) << 3) | t.idx);
+            t.keyOn = true;
+          }
           t.gate = nn + 1;
         } else {
           t.gate = nn + 1;
@@ -2218,6 +2269,7 @@ MdxPlayer.prototype.endSong = function () {
   for (var i = 0; i < this.tracks.length; i++) {
     this.noteOff(this.tracks[i]);
     this.tracks[i].counter = -1;
+    this.tracks[i].dead = true;
   }
   this.ended = true;
 };
@@ -2297,11 +2349,22 @@ MdxPlayer.prototype.tick = function () {
      * flag therefore lives from the F7 until the next length
      * expires — it is NOT dropped per command. */
     if (t.counter === 0) t.keyoffDisable = false;
+    /* A dead track never parses its own data again. E7 04 may have
+     * charged this track a length for an injected event; that note
+     * has now counted down and keyed off in the gate handling
+     * above, but the track's own ptr sits just past its end marker
+     * — at the next track's data or the voice data — and parsing
+     * from there would read garbage as events. MXDRV swaps a
+     * finished track's pointer to dummy data (7f f1 00: a rest,
+     * then end again) at L001442, so an injected note is followed
+     * by a harmless rest -> end cycle; pinning the counter at -1
+     * here, before the parse loop, is the equivalent. */
+    if (t.dead && t.counter === 0) t.counter = -1;
     while (t.counter === 0 && !t.waiting && !this.ended) {
       var r = this.parseEvent(t);
-      if (r < 0) { t.counter = -1; break; }
+      if (r < 0) { t.counter = -1; t.dead = true; break; }
       t.counter = r;
-      if (++guard > 100000) { this.errors.push({ track: t.idx, offset: t.ptr, opcode: -1, tick: this.tickCount }); t.counter = -1; break; }
+      if (++guard > 100000) { this.errors.push({ track: t.idx, offset: t.ptr, opcode: -1, tick: this.tickCount }); t.counter = -1; t.dead = true; break; }
     }
     if (this.ended) return;
   }
@@ -3384,6 +3447,17 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.idx = idx; this.isPCM = isPCM;
   this.startPtr = startPtr; this.ptr = startPtr;
   this.counter = 1; this.gate = 1;
+  /* dead: set once the track has truly ended — the F1 data end, an
+   * E7 00 / >= 07 track end, an undefined opcode or an out-of-range
+   * E7 04 channel (error stop), the parse-loop runaway guard, the
+   * one-shot (loop disabled) second-pass F1 end, or endSong — via
+   * the counter = -1 paths in tick / parseEvent / endSong. Loop
+   * jumps (an F1 with a loop operand, F5 repeats, shared-data
+   * jumps) never set it. A dead track never parses its own data
+   * again, even when E7 04 charges it a length afterwards; see
+   * tick. Tracks are rebuilt by resetPlayback, so a reload /
+   * restart always starts with the flag down. */
+  this.dead = false;
   this.voiceNum = 0; this.voiceDirty = true;
   this.appliedVoiceNum = -1; this.appliedVoice = null;
   this.totalLevel = [0, 0, 0, 0];
@@ -4066,7 +4140,13 @@ MdxPlayer.prototype.parseEvent = function (t) {
          * as a marker object and the frame owning that track
          * returns it as its own result, so the tick loop charges
          * the right track. An out-of-range channel byte is an
-         * error, handled like the undefined opcodes below. */
+         * error, handled like the undefined opcodes below. The
+         * target's legato flag is cleared before the event runs
+         * (andi.b #$7b). Injecting into an already-ended track is
+         * allowed and sounds for the charged length; the target's
+         * dead flag (see tick) then keeps it from ever parsing
+         * past its own end marker — the equivalent of MXDRV's
+         * dummy-data pointer swap at L001442. */
         var ch = d[t.ptr++];
         var target = (ch !== undefined && ch < this.tracks.length) ? this.tracks[ch] : null;
         if (!target) {
@@ -4074,6 +4154,13 @@ MdxPlayer.prototype.parseEvent = function (t) {
           this.noteOff(t);
           return -1;
         }
+        /* MXDRV clears the TARGET channel's legato (F7) flag
+         * before executing the event (andi.b #$7b,$0016(a6)), so an
+         * injected note keys on normally even if the target was in
+         * a legato passage. This also covers the self-addressed
+         * path below: the target is this track itself there, and
+         * MXDRV drops its flag just the same. */
+        target.keyoffDisable = false;
         if (target === t) return this.parseEvent(t);
         if (!this._e7Chain) this._e7Chain = [];
         this._e7Chain.push(t);
@@ -4092,7 +4179,7 @@ MdxPlayer.prototype.parseEvent = function (t) {
         }
         if (r < 0) {
           if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: -1 };
-          target.counter = -1; return 0;
+          target.counter = -1; target.dead = true; return 0;
         }
         if (r > 0) {
           if (this._e7Chain.indexOf(target) >= 0) return { track: target, value: r };
@@ -4105,10 +4192,11 @@ MdxPlayer.prototype.parseEvent = function (t) {
          * length — gate and length are both nn + 1 — the track
          * keys on at its CURRENT pitch, and parsing stops there
          * for nn + 1 ticks. The current pitch is the track's last
-         * note (t.note, the value the pitch report reads), passed
-         * to noteOn as usual; the gate is then set to nn + 1
-         * directly, because noteOn derives the gate from the @q
-         * setting while MXDRV sets it outright. If no note has
+         * note (t.note, the value the pitch report reads). The
+         * key-on is the DIRECT register write below (L000e7e), not
+         * the normal noteOn path, and the gate is set to nn + 1
+         * outright, because noteOn would derive it from the @q
+         * setting while MXDRV sets it directly. If no note has
          * sounded yet on this track (t.note < 0) there is no
          * current pitch in the engine's state — freqWrite itself
          * refuses note < 0 — so only the timing is taken: the
@@ -4116,7 +4204,33 @@ MdxPlayer.prototype.parseEvent = function (t) {
         var nn = d[t.ptr++];
         if (nn === undefined) nn = 0;
         if (t.note >= 0) {
-          this.noteOn(t, t.note, nn + 1);
+          /* Direct key-on (L00178a -> L000e7e): MXDRV writes only
+           * the key-on register here. Because the normal note path
+           * is bypassed, an armed F0 key-on delay does NOT defer
+           * this key-on and the E9 LFO delay is NOT reloaded; no
+           * frequency / volume / voice registers are written, and
+           * the hardware-LFO sync reset writes (which live in the
+           * normal note path) do not happen either. A key-on still
+           * waiting under an F0 delay is cancelled first (the
+           * pending flag is dropped), and a track that is already
+           * keyed on is left alone — no retrigger. On a PCM track
+           * the same direct path starts the sample for the current
+           * note number (L000e7e drives the PCM side too). */
+          t.keyOnPending = false;
+          /* The report-only bookkeeping the normal note path
+           * performs (the per-track note count, and on PCM the
+           * PDX usage set) is kept, so state reports see this
+           * key-on exactly like a normal note's. */
+          this.noteCounts[t.idx]++;
+          if (t.isPCM) {
+            var bank = t.voiceNum & 0x0F;
+            if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
+            this.pcmUsage[bank].add(t.note);
+            if (!t.pcmKeyOn) this._pcmStart(t, t.note);
+          } else if (!t.keyOn && t.pan !== 0 && !this._chSilent(t)) {
+            this.ym.write(0x08, ((t.slotMask & 0x0F) << 3) | t.idx);
+            t.keyOn = true;
+          }
           t.gate = nn + 1;
         } else {
           t.gate = nn + 1;
@@ -4138,6 +4252,7 @@ MdxPlayer.prototype.endSong = function () {
   for (var i = 0; i < this.tracks.length; i++) {
     this.noteOff(this.tracks[i]);
     this.tracks[i].counter = -1;
+    this.tracks[i].dead = true;
   }
   this.ended = true;
 };
@@ -4217,11 +4332,22 @@ MdxPlayer.prototype.tick = function () {
      * flag therefore lives from the F7 until the next length
      * expires — it is NOT dropped per command. */
     if (t.counter === 0) t.keyoffDisable = false;
+    /* A dead track never parses its own data again. E7 04 may have
+     * charged this track a length for an injected event; that note
+     * has now counted down and keyed off in the gate handling
+     * above, but the track's own ptr sits just past its end marker
+     * — at the next track's data or the voice data — and parsing
+     * from there would read garbage as events. MXDRV swaps a
+     * finished track's pointer to dummy data (7f f1 00: a rest,
+     * then end again) at L001442, so an injected note is followed
+     * by a harmless rest -> end cycle; pinning the counter at -1
+     * here, before the parse loop, is the equivalent. */
+    if (t.dead && t.counter === 0) t.counter = -1;
     while (t.counter === 0 && !t.waiting && !this.ended) {
       var r = this.parseEvent(t);
-      if (r < 0) { t.counter = -1; break; }
+      if (r < 0) { t.counter = -1; t.dead = true; break; }
       t.counter = r;
-      if (++guard > 100000) { this.errors.push({ track: t.idx, offset: t.ptr, opcode: -1, tick: this.tickCount }); t.counter = -1; break; }
+      if (++guard > 100000) { this.errors.push({ track: t.idx, offset: t.ptr, opcode: -1, tick: this.tickCount }); t.counter = -1; t.dead = true; break; }
     }
     if (this.ended) return;
   }
