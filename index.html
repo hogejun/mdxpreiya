@@ -1547,9 +1547,10 @@ function MdxPlayer(sampleRate) {
    * executes (see parseEvent case 0xE8); until then PCM plays as
    * normal ADPCM — @ selects no bank and the PCM8 volume table does
    * not apply — whatever parseMDX's isPCM8 heuristic (16 tracks /
-   * leading E8) says. That heuristic now serves display / info use
-   * only. One flag for the whole player, not per track, and in-song
-   * loop jumps (F1 / F5) do not clear it. */
+   * leading E8) says. Nothing reads that heuristic anymore;
+   * parseMDX still returns it as parse information only. One flag
+   * for the whole player, not per track, and in-song loop jumps
+   * (F1 / F5) do not clear it. */
   this.pcm8Mode = false;
   /* X68Sound shared ADPCM output stage state (stereo, 62.5 kHz) */
   this.adS1 = [0, 0]; this.adS2 = [0, 0];
@@ -1873,7 +1874,8 @@ MdxPlayer.prototype._pcmStart = function (t, noteNum, sampleNumHeld) {
    * E8 executes — including on a 16-track song parseMDX's isPCM8
    * heuristic calls PCM8 — the stored @ is never read back and
    * the sample always comes from the PDX's first bank, i.e.
-   * normal ADPCM. (isPCM8 remains for display / info use only.
+   * normal ADPCM. (isPCM8 is still returned by parseMDX, but
+   * nothing reads it anymore.
    * History: before v49 the player passed voiceNum & 0x0F as a
    * bank index in every mode, so on a single-bank PDX any PCM
    * @n with n > 0 silenced the rest of the track — one song after
