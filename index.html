@@ -268,6 +268,44 @@
       #anVuCanvas { display: block; width: 100%; height: 118px; }
       .anlfo { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin-top: 10px; }
       .anlfo .stat .v { font-size: 0.84rem; line-height: 1.5; }
+      /* ================= solo close-up overlay (v54) =================
+       * A floating panel (not a modal: no mask, only the panel
+       * itself takes pointer events) that appears over the console
+       * while exactly one channel is soloed. 案A vertical stack:
+       * header chips, a big keyboard centred on the current note
+       * (±2 octaves), tuner + VU needle meters side by side, the
+       * pitch and volume traces, and the FM voice-parameter table.
+       * It reuses the analysis / voice-detail data reports; the
+       * engine is untouched and the console layout never changes —
+       * the panel simply overlays it and can be dragged by its
+       * header. */
+      .closeup {
+        position: fixed; z-index: 60;
+        width: min(720px, calc(100vw - 16px));
+        max-height: calc(100dvh - 16px);
+        overflow-y: auto; overscroll-behavior: contain;
+        margin: 0; padding: 10px 12px 12px;
+      }
+      .closeup[hidden] { display: none !important; }
+      .cu-drag { cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
+      .cu-drag .tbtn { cursor: pointer; }
+      .cu-readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 2px; }
+      @media (max-width: 560px) { .cu-readout { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      /* Current-note value in the close-up header: fixed at
+       * exactly two lines (note name on line 1, the MIDI number
+       * on line 2 — see cuUpdateHeader, which joins them with a
+       * newline rendered via pre-line). Reserving the second
+       * line even for the one-line "—" state keeps the keyboard
+       * and everything below it from shifting whenever the note
+       * text would otherwise fit on one line or wrap to two. */
+      #cuStatNote { white-space: pre-line; line-height: 1.5; height: 3em; min-height: 3em; overflow: hidden; }
+      .cu-kbwrap { background: var(--spec-bg); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+      #cuKbCanvas { display: block; width: 100%; height: 96px; }
+      .cu-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+      @media (max-width: 560px) { .cu-meters { grid-template-columns: 1fr; } }
+      #cuTunerCanvas, #cuVuCanvas { display: block; width: 100%; height: 118px; }
+      #cuPitchCanvas { display: block; width: 100%; height: 130px; }
+      #cuVolCanvas { display: block; width: 100%; height: 76px; }
       /* ================= MMDSP-style status theme (v27) =================
        * The status/display panels (player readouts, spectrum,
        * channel tracks, voice detail, channel analysis) wear a
@@ -630,6 +668,54 @@
       </div>
       </div>
       </div>
+
+      <!-- ===================== solo close-up overlay (v54) =====================
+           Floating panel (no mask, not a modal): shown only while
+           exactly one channel is soloed. Draggable by its header.
+           案A vertical stack: header chips / big keyboard / needle
+           meters / pitch trace / volume trace / voice parameters. -->
+      <section class="panel dsp closeup" id="closeupPanel" aria-label="ソロ・クローズアップ" hidden>
+        <div class="cu-drag" id="cuDragHandle">
+          <p class="micro">Solo Close-Up</p>
+          <div class="chhead">
+            <h2 id="cuTitle">ソロ・クローズアップ</h2>
+            <button class="tbtn" id="btnCuClose" type="button" aria-label="クローズアップを閉じる">× 閉じる</button>
+          </div>
+          <div class="cu-readout">
+            <div class="stat"><div class="k">チャンネル</div><div class="v" id="cuStatCh">—</div></div>
+            <div class="stat"><div class="k">音色番号</div><div class="v" id="cuStatVoice">—</div></div>
+            <div class="stat"><div class="k">パン</div><div class="v" id="cuStatPan">—</div></div>
+            <div class="stat"><div class="k">現在のノート</div><div class="v" id="cuStatNote">—</div></div>
+          </div>
+        </div>
+        <p class="anlabel">鍵盤（現在音を中心に ±2 オクターブ／緑のマーカーはピッチの寄り）</p>
+        <div class="cu-kbwrap"><canvas id="cuKbCanvas" aria-hidden="true"></canvas></div>
+        <div class="cu-meters">
+          <div>
+            <p class="anlabel">デチューン（チューナー式メーター／単位 cent）</p>
+            <div class="meterwrap tuner"><canvas id="cuTunerCanvas" aria-hidden="true"></canvas></div>
+          </div>
+          <div>
+            <p class="anlabel">実効音量（VU 式メーター／0 VU はレベル 0.70 基準）</p>
+            <div class="meterwrap vu"><canvas id="cuVuCanvas" aria-hidden="true"></canvas></div>
+          </div>
+        </div>
+        <p class="anlabel">ピッチトレース（横線＝半音グリッド、破線＝公称ノート）</p>
+        <div class="anwrap"><canvas id="cuPitchCanvas" aria-hidden="true"></canvas></div>
+        <p class="anlabel">音量トレース</p>
+        <div class="anwrap"><canvas id="cuVolCanvas" aria-hidden="true"></canvas></div>
+        <p class="anlabel">音色パラメータ</p>
+        <p class="chhelp" id="cuVoiceMeta">—</p>
+        <div class="cu-readout" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+          <div class="stat"><div class="k">音色番号</div><div class="v" id="cuStatNum">—</div></div>
+          <div class="stat"><div class="k">ALG（アルゴリズム）</div><div class="v" id="cuStatAlg">—</div></div>
+          <div class="stat"><div class="k">FB（フィードバック）</div><div class="v" id="cuStatFb">—</div></div>
+        </div>
+        <table class="voice-table" id="cuVoiceTable">
+          <thead><tr><th scope="col">パラメータ</th><th scope="col">M1</th><th scope="col">M2</th><th scope="col">C1</th><th scope="col">C2</th></tr></thead>
+          <tbody id="cuVoiceTbody"></tbody>
+        </table>
+      </section>
 
       <!-- ===================== library ===================== -->
       <section class="panel" aria-label="動作確認">
@@ -2980,7 +3066,14 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         anTunerCv: $('anTunerCanvas'), anVuCv: $('anVuCanvas'),
         anNote: $('anStatNote'), anPitch: $('anStatPitch'),
         anDetuneSet: $('anStatDetuneSet'), anPorta: $('anStatPorta'),
-        anLfoPitch: $('anLfoPitch'), anLfoVol: $('anLfoVol'), anLfoDelay: $('anLfoDelay')
+        anLfoPitch: $('anLfoPitch'), anLfoVol: $('anLfoVol'), anLfoDelay: $('anLfoDelay'),
+        cuPanel: $('closeupPanel'), cuTitle: $('cuTitle'), cuClose: $('btnCuClose'), cuDrag: $('cuDragHandle'),
+        cuCh: $('cuStatCh'), cuVoice: $('cuStatVoice'), cuPan: $('cuStatPan'), cuNote: $('cuStatNote'),
+        cuKbCv: $('cuKbCanvas'), cuTunerCv: $('cuTunerCanvas'), cuVuCv: $('cuVuCanvas'),
+        cuPitchCv: $('cuPitchCanvas'), cuVolCv: $('cuVolCanvas'),
+        cuVoiceMeta: $('cuVoiceMeta'), cuVoiceTbody: $('cuVoiceTbody'),
+        cuNum: $('cuStatNum'), cuAlg: $('cuStatAlg'), cuFb: $('cuStatFb'),
+        consolePanel: $('consolePanel')
       };
       const LIBRARY = [];
       const LIBRARY_EXTRA = [];
@@ -3231,6 +3324,24 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * after it is un-silenced. Loading a song resets both arrays
        * (see loadSong). */
       let chMute = [], chSolo = [];
+      /* Solo close-up state (v54), declared here because
+       * refreshMuteSoloDisplay() — the hook that drives the
+       * close-up — already runs during initial script evaluation
+       * (buildChannels below); `let` declarations further down
+       * would still be in the TDZ. cuCh: channel the close-up is
+       * open for (or null); cuSuppressedKey: the solo composition
+       * (comma-joined solo indices) for which the × button
+       * suppressed the panel — any change of composition clears
+       * the suppression and the panel may show again. */
+      let cuCh = null, cuData = null, cuPlaying = false, cuState = null;
+      let cuSuppressedKey = null, cuPositioned = false;
+      let cuVoiceNum = null, cuKbCenter = 60, cuDraws = 0;
+      const cuTxt = {};
+      /* Close-up needle-meter state, also declared here: cuHide()
+       * (via refreshCloseup) already runs during initialisation. */
+      const cuMtTuner = { pos: 0, vel: 0, target: null };  /* cents */
+      const cuMtVu = { pos: 0, vel: 0, target: 0 };        /* scale fraction */
+      let cuMeterRAF = 0, cuMeterLastTs = 0, cuMeterDraws = 0;
       function chAnySolo() { return chSolo.some(Boolean); }
       function chIsSilent(i) { return !!chMute[i] || (chAnySolo() && !chSolo[i]); }
       function refreshMuteSoloDisplay() {
@@ -3241,6 +3352,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           r.btnS.setAttribute('aria-pressed', String(!!chSolo[i]));
           r.row.classList.toggle('silenced', chIsSilent(i));
         }
+        refreshCloseup();
       }
       function sendMuteSolo() {
         if (backend === 'worklet' && workletNode) {
@@ -3884,6 +3996,459 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         getState: () => ({ open: anCh != null, ch: anCh, draws: anDraws, samples: anData ? anData.pitch.length : 0, playing: anPlaying,
           meters: { draws: meterDraws, raf: !!meterRAF, tunerPos: mtTuner.pos, tunerTarget: mtTuner.target, vuPos: mtVu.pos, vuTarget: mtVu.target } })
       };
+      /* ---------------- solo close-up overlay (v54) ----------------
+       * A floating panel (案A vertical stack) that appears while
+       * EXACTLY ONE channel is soloed: none at 0 solos, none at 2+.
+       * The target follows only the unique-solo state — soloing a
+       * different channel so it becomes the only solo moves the
+       * target; plain channel clicks (name / @n, which open the
+       * detail-area panels) never move it, and the detail area is
+       * not touched at all: the close-up simply overlays the
+       * console (solo "wins" by being on top). It is not a modal:
+       * there is no mask, only the panel itself receives pointer
+       * events, and its header can be dragged, so the channel
+       * list's M/S buttons stay reachable. The × button hides it
+       * for the CURRENT solo composition only; as soon as the
+       * composition changes it may appear again. Song loads reset
+       * mute/solo, which closes it naturally through the same hook
+       * (refreshMuteSoloDisplay -> refreshCloseup).
+       * Content reuses existing reports only: header / keyboard
+       * from the state reports (voices / pans / notes), meters and
+       * traces from the analysis report (getAnalysis), and the
+       * voice table from the voice-detail report (getVoiceDetail)
+       * — requested with the same worklet messages the detail
+       * panels use, so the engine (#worklet-src) is unchanged. */
+      const cuCells = [], cuCellTxt = [];
+      (function buildCuVoiceTable() {
+        if (!els.cuVoiceTbody) return;
+        for (let p = 0; p < VOICE_PARAMS.length; p++) {
+          const tr = document.createElement('tr');
+          const th = document.createElement('td'); th.textContent = VOICE_PARAMS[p][0]; th.className = 'pname';
+          tr.appendChild(th); cuCells.push([]); cuCellTxt.push([]);
+          for (let o = 0; o < 4; o++) {
+            const td = document.createElement('td'); td.textContent = '—';
+            tr.appendChild(td); cuCells[p].push(td); cuCellTxt[p].push('—');
+          }
+          els.cuVoiceTbody.appendChild(tr);
+        }
+      })();
+      function cuSet(key, el, txt) { if (el && cuTxt[key] !== txt) { cuTxt[key] = txt; el.textContent = txt; } }
+      function cuSoloIndices() { const a = []; for (let i = 0; i < chSolo.length; i++) if (chSolo[i]) a.push(i); return a; }
+      function cuMeterResetTargets() { cuMtTuner.target = null; cuMtVu.target = 0; }
+      function cuHide() {
+        if (els.cuPanel && !els.cuPanel.hidden) els.cuPanel.hidden = true;
+        cuMeterSync();
+      }
+      function refreshCloseup() {
+        if (!els.cuPanel) return;
+        const solos = cuSoloIndices();
+        const key = solos.join(',');
+        if (cuSuppressedKey != null && key !== cuSuppressedKey) cuSuppressedKey = null;
+        if (solos.length !== 1 || cuSuppressedKey === key) { cuHide(); return; }
+        const ch = solos[0];
+        if (cuCh !== ch || els.cuPanel.hidden) cuShow(ch);
+      }
+      function cuShow(ch) {
+        const changed = cuCh !== ch;
+        cuCh = ch; cuData = null;
+        if (changed) { cuVoiceNum = null; cuKbCenter = 60; cuMeterResetTargets(); cuClearVoiceCells(); }
+        els.cuPanel.hidden = false;
+        const title = 'ソロ・クローズアップ — ' + anChLabel(ch);
+        if (els.cuTitle.textContent !== title) els.cuTitle.textContent = title;
+        cuSet('ch', els.cuCh, anChLabel(ch));
+        if (!cuPositioned) cuPositionPanel();
+        cuRefreshVoicePane();
+        cuRequestAnalysis();
+        cuRequestVoiceDetail();
+        cuDrawKeyboard();
+        cuDrawCuTraces();
+        cuDrawCuMeters();
+        cuMeterSync();
+      }
+      function cuPositionPanel() {
+        const p = els.cuPanel; if (!p) return;
+        const w = p.offsetWidth || 720, h = p.offsetHeight || 300;
+        let left = Math.max(8, (window.innerWidth - w) / 2), top = 12;
+        const c = els.consolePanel;
+        if (c) {
+          const r = c.getBoundingClientRect();
+          left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + (r.width - w) / 2));
+          top = Math.max(8, Math.min(window.innerHeight - 60, r.top + Math.max(0, (r.height - h) / 2)));
+        }
+        p.style.left = left + 'px'; p.style.top = top + 'px';
+        cuPositioned = true;
+      }
+      /* Drag by the header (the × button is excluded). Pointer
+       * capture keeps the drag alive outside the panel; the panel
+       * is clamped so its header always stays reachable. */
+      let cuDragState = null;
+      if (els.cuDrag) {
+        els.cuDrag.addEventListener('pointerdown', (e) => {
+          if (e.target && e.target.closest && e.target.closest('button')) return;
+          const r = els.cuPanel.getBoundingClientRect();
+          cuDragState = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+          try { els.cuDrag.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+          e.preventDefault();
+        });
+        els.cuDrag.addEventListener('pointermove', (e) => {
+          if (!cuDragState) return;
+          const w = els.cuPanel.offsetWidth || 720;
+          const left = Math.max(-w + 90, Math.min(window.innerWidth - 90, e.clientX - cuDragState.dx));
+          const top = Math.max(0, Math.min(window.innerHeight - 44, e.clientY - cuDragState.dy));
+          els.cuPanel.style.left = left + 'px'; els.cuPanel.style.top = top + 'px';
+        });
+        const cuDragEnd = () => { cuDragState = null; };
+        els.cuDrag.addEventListener('pointerup', cuDragEnd);
+        els.cuDrag.addEventListener('pointercancel', cuDragEnd);
+      }
+      if (els.cuClose) els.cuClose.addEventListener('click', () => {
+        /* Suppress for the current solo composition only. */
+        cuSuppressedKey = cuSoloIndices().join(',');
+        cuHide();
+      });
+      /* ---- header chips + big keyboard (from state reports) ---- */
+      function cuUpdateHeader(s) {
+        if (cuCh == null || !s) return;
+        cuSet('ch', els.cuCh, anChLabel(cuCh));
+        cuSet('voice', els.cuVoice, (s.voices && typeof s.voices[cuCh] === 'number') ? '@' + s.voices[cuCh] : '@—');
+        cuSet('pan', els.cuPan, (s.pans && typeof s.pans[cuCh] === 'number') ? PAN_LABELS[s.pans[cuCh] & 3] : '—');
+        const n = (s.notes && typeof s.notes[cuCh] === 'number' && isFinite(s.notes[cuCh])) ? s.notes[cuCh] : null;
+        cuSet('note', els.cuNote, n != null ? (noteNameOf(n) + '\n（MIDI ' + n.toFixed(1) + '）') : '—');
+      }
+      function cuDrawKeyboard() {
+        const cv = els.cuKbCv;
+        if (!cv || cuCh == null || !els.cuPanel || els.cuPanel.hidden) return;
+        cuDraws++;
+        const dim = anSetupCanvas(cv), W = dim[0], H = dim[1], dpr = dim[2];
+        const g = cv.getContext('2d'); if (!g) return;
+        const cs = getComputedStyle(els.cuPanel);
+        const bg = cs.getPropertyValue('--spec-bg').trim() || '#04060f';
+        const grid = cs.getPropertyValue('--spec-grid').trim() || '#1d3a63';
+        const accent = cs.getPropertyValue('--accent').trim() || '#54c8ff';
+        const led = cs.getPropertyValue('--led').trim() || '#3dff6e';
+        const dimCol = cs.getPropertyValue('--ink-dim').trim() || '#8fc3ee';
+        g.fillStyle = bg; g.fillRect(0, 0, W, H);
+        const note = (cuState && cuState.notes && typeof cuState.notes[cuCh] === 'number' && isFinite(cuState.notes[cuCh])) ? cuState.notes[cuCh] : null;
+        if (note != null) {
+          const near = Math.round(note);
+          if (Math.abs(near - cuKbCenter) > 12) cuKbCenter = Math.max(24, Math.min(96, near));
+          else if (cuKbCenter === 60 && near !== 60) cuKbCenter = Math.max(24, Math.min(96, near));
+        }
+        const lo = cuKbCenter - 24, hi = cuKbCenter + 24;
+        const isWhite = (m) => { const pc = ((m % 12) + 12) % 12; return pc === 0 || pc === 2 || pc === 4 || pc === 5 || pc === 7 || pc === 9 || pc === 11; };
+        const whites = [];
+        for (let m = lo; m <= hi; m++) if (isWhite(m)) whites.push(m);
+        const ww = W / whites.length;
+        const near = note != null ? Math.round(note) : null;
+        /* white keys */
+        for (let i = 0; i < whites.length; i++) {
+          const m = whites[i];
+          g.fillStyle = (near === m) ? led : '#13224a';
+          g.fillRect(i * ww + 0.5, 0, ww - 1, H);
+          if (((m % 12) + 12) % 12 === 0) {
+            g.fillStyle = (near === m) ? '#04101f' : dimCol;
+            g.font = Math.round(9 * dpr) + 'px ui-monospace, Menlo, monospace';
+            g.textAlign = 'center';
+            g.fillText(noteNameOf(m), i * ww + ww / 2, H - 5 * dpr);
+          }
+        }
+        /* black keys */
+        for (let i = 0; i < whites.length - 1; i++) {
+          const m = whites[i] + 1;
+          if (m > hi || isWhite(m)) continue;
+          const pc = ((whites[i] % 12) + 12) % 12;
+          if (!(pc === 0 || pc === 2 || pc === 5 || pc === 7 || pc === 9)) continue;
+          g.fillStyle = (near === m) ? led : '#030612';
+          const bw = ww * 0.62;
+          g.fillRect((i + 1) * ww - bw / 2, 0, bw, H * 0.62);
+          g.strokeStyle = grid; g.lineWidth = 1;
+          g.strokeRect((i + 1) * ww - bw / 2 + 0.5, 0.5, bw - 1, H * 0.62 - 1);
+        }
+        g.textAlign = 'left';
+        /* pitch-bend marker: a cyan line at the EXACT pitch in
+         * pitch space, so its offset from the lit key's centre
+         * reads directly as the bend / detune amount. */
+        if (note != null) {
+          const x = (note - lo + 0.5) / (hi - lo + 1) * W;
+          g.strokeStyle = accent; g.lineWidth = Math.max(2, 2 * dpr);
+          g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
+          const cents = Math.round((note - near) * 100);
+          g.fillStyle = accent;
+          g.font = Math.round(9.5 * dpr) + 'px ui-monospace, Menlo, monospace';
+          const label = noteNameOf(note) + (cents ? (' ' + (cents > 0 ? '+' : '') + cents + ' cent') : '');
+          const tx = Math.max(3 * dpr, Math.min(W - g.measureText(label).width - 3 * dpr, x + 4 * dpr));
+          g.fillText(label, tx, 11 * dpr);
+        } else {
+          g.fillStyle = dimCol;
+          g.font = Math.round(9.5 * dpr) + 'px ui-monospace, Menlo, monospace';
+          g.fillText('（無音）', 4 * dpr, 11 * dpr);
+        }
+      }
+      /* ---- needle meters (same scales / springs as v26) ---- */
+      function cuMeterPhysics(dt) {
+        const n = Math.max(1, Math.ceil(dt / 0.0042)), h = dt / n;
+        for (let i = 0; i < n; i++) {
+          meterStep(cuMtTuner, cuMtTuner.target == null ? 0 : cuMtTuner.target, 60, 0.9, h);
+          meterStep(cuMtVu, cuMtVu.target, 18, 0.72, h);
+        }
+        if (cuMtVu.pos < -0.03) { cuMtVu.pos = -0.03; cuMtVu.vel = 0; }
+        if (cuMtVu.pos > 1.04) { cuMtVu.pos = 1.04; cuMtVu.vel = 0; }
+      }
+      function cuMeterLoop(ts) {
+        cuMeterRAF = 0;
+        if (cuCh == null || !cuPlaying || !els.cuPanel || els.cuPanel.hidden) return;
+        const dt = cuMeterLastTs ? Math.min(0.05, Math.max(0.001, (ts - cuMeterLastTs) / 1000)) : 0.016;
+        cuMeterLastTs = ts;
+        cuMeterPhysics(dt);
+        cuDrawCuMeters();
+        cuMeterRAF = requestAnimationFrame(cuMeterLoop);
+      }
+      function cuMeterSync() {
+        const want = cuCh != null && cuPlaying && els.cuPanel && !els.cuPanel.hidden;
+        if (want && !cuMeterRAF) { cuMeterLastTs = 0; cuMeterRAF = requestAnimationFrame(cuMeterLoop); }
+        else if (!want && cuMeterRAF) { cancelAnimationFrame(cuMeterRAF); cuMeterRAF = 0; }
+      }
+      function cuDrawCuMeters() {
+        const tc = els.cuTunerCv, vc2 = els.cuVuCv;
+        if (!tc || !vc2 || !els.cuPanel) return;
+        cuMeterDraws++;
+        const cs = getComputedStyle(els.cuPanel);
+        const bg = cs.getPropertyValue('--spec-bg').trim() || '#04060f';
+        const grid = cs.getPropertyValue('--spec-grid').trim() || '#1d3a63';
+        const accent = cs.getPropertyValue('--accent').trim() || '#54c8ff';
+        const led = cs.getPropertyValue('--led').trim() || '#3dff6e';
+        const dim = cs.getPropertyValue('--ink-dim').trim() || '#8fc3ee';
+        const face = cs.getPropertyValue('--meter-face').trim() || '#0a1430';
+        const mink = cs.getPropertyValue('--meter-ink').trim() || '#d6ecff';
+        const mred = cs.getPropertyValue('--meter-red').trim() || '#ff6a5e';
+        const msub = cs.getPropertyValue('--meter-sub').trim() || '#7fa8cf';
+        { /* tuner */
+          const d = anSetupCanvas(tc), W = d[0], H = d[1], dpr = d[2];
+          const g = tc.getContext('2d'); if (!g) return;
+          g.fillStyle = bg; g.fillRect(0, 0, W, H);
+          const px = W / 2, py = H * 0.94, R = Math.min(W * 0.47, H * 0.88);
+          const ang = (c) => tunerFrac(c) * 68 * Math.PI / 180;
+          g.strokeStyle = accent; g.lineWidth = Math.max(2, 3 * dpr); g.globalAlpha = 0.55;
+          g.beginPath(); g.arc(px, py, R, -Math.PI / 2 + ang(-10), -Math.PI / 2 + ang(10)); g.stroke();
+          g.globalAlpha = 1;
+          const ticks = [-600, -400, -200, -100, -50, -25, -10, 0, 10, 25, 50, 100, 200, 400, 600];
+          const labels = { '-200': '-200', '-100': '-100', '-50': '-50', '0': '0', '50': '+50', '100': '+100', '200': '+200' };
+          g.font = Math.round(8.5 * dpr) + 'px ui-monospace, Menlo, monospace';
+          g.textAlign = 'center';
+          for (let i = 0; i < ticks.length; i++) {
+            const c = ticks[i], a = ang(c), major = (c === 0 || Math.abs(c) === 50 || Math.abs(c) === 100 || Math.abs(c) === 200);
+            const r1 = R - (major ? 9 : 5.5) * dpr;
+            g.strokeStyle = c === 0 ? accent : grid; g.lineWidth = major ? Math.max(1.4, 1.4 * dpr) : 1;
+            g.beginPath();
+            g.moveTo(px + Math.sin(a) * r1, py - Math.cos(a) * r1);
+            g.lineTo(px + Math.sin(a) * R, py - Math.cos(a) * R);
+            g.stroke();
+            if (labels[String(c)] != null) {
+              g.fillStyle = c === 0 ? accent : dim;
+              g.fillText(labels[String(c)], px + Math.sin(a) * (R - 15 * dpr), py - Math.cos(a) * (R - 15 * dpr) + 3 * dpr);
+            }
+          }
+          g.fillStyle = dim; g.fillText('cent', px, py - R + 24 * dpr);
+          const na = ang(Math.max(-600, Math.min(600, cuMtTuner.pos)));
+          g.strokeStyle = led; g.lineWidth = Math.max(1.6, 1.8 * dpr);
+          g.beginPath(); g.moveTo(px - Math.sin(na) * 7 * dpr, py + Math.cos(na) * 7 * dpr);
+          g.lineTo(px + Math.sin(na) * (R - 3 * dpr), py - Math.cos(na) * (R - 3 * dpr)); g.stroke();
+          g.fillStyle = led; g.beginPath(); g.arc(px, py, 3.4 * dpr, 0, Math.PI * 2); g.fill();
+          g.textAlign = 'left';
+        }
+        { /* VU */
+          const d = anSetupCanvas(vc2), W = d[0], H = d[1], dpr = d[2];
+          const g = vc2.getContext('2d'); if (!g) return;
+          g.fillStyle = face; g.fillRect(0, 0, W, H);
+          const px = W / 2, py = H * 1.04, R = H * 0.94;
+          const ang = (f) => (-42 + f * 84) * Math.PI / 180;
+          g.strokeStyle = mred; g.lineWidth = Math.max(2, 3 * dpr);
+          g.beginPath(); g.arc(px, py, R - 12 * dpr, -Math.PI / 2 + ang(vuFracFromDb(0)), -Math.PI / 2 + ang(1)); g.stroke();
+          g.font = Math.round(8.5 * dpr) + 'px ui-monospace, Menlo, monospace';
+          g.textAlign = 'center';
+          const vticks = [-20, -10, -7, -5, -3, -2, -1, 0, 3];
+          for (let i = 0; i < vticks.length; i++) {
+            const db = vticks[i], f = vuFracFromDb(db), a = ang(f), red = db >= 0;
+            const r1 = R - 20 * dpr;
+            g.strokeStyle = red ? mred : mink; g.lineWidth = Math.max(1.2, 1.3 * dpr);
+            g.beginPath();
+            g.moveTo(px + Math.sin(a) * r1, py - Math.cos(a) * r1);
+            g.lineTo(px + Math.sin(a) * (R - 12 * dpr), py - Math.cos(a) * (R - 12 * dpr));
+            g.stroke();
+            g.fillStyle = red ? mred : mink;
+            g.fillText(db > 0 ? '+' + db : String(db), px + Math.sin(a) * (R - 27 * dpr), py - Math.cos(a) * (R - 27 * dpr) + 3 * dpr);
+          }
+          g.fillStyle = msub; g.fillText('VU', px, py - R * 0.52);
+          const na = ang(Math.max(-0.03, Math.min(1.04, cuMtVu.pos)));
+          g.strokeStyle = mink; g.lineWidth = Math.max(1.4, 1.6 * dpr);
+          g.beginPath(); g.moveTo(px - Math.sin(na) * 8 * dpr, py + Math.cos(na) * 8 * dpr);
+          g.lineTo(px + Math.sin(na) * (R - 14 * dpr), py - Math.cos(na) * (R - 14 * dpr)); g.stroke();
+          g.fillStyle = mink; g.beginPath(); g.arc(px, py - 2 * dpr, 3.4 * dpr, 0, Math.PI * 2); g.fill();
+          g.textAlign = 'left';
+        }
+      }
+      /* ---- traces (analysis history, same drawing as v25) ---- */
+      function cuDrawCuTraces() {
+        if (cuCh == null || !cuData || !els.cuPanel || els.cuPanel.hidden) return;
+        cuDrawCuMeters();
+        const pc = els.cuPitchCv, vc = els.cuVolCv;
+        if (!pc || !vc) return;
+        const cs = getComputedStyle(els.cuPanel);
+        const bg = cs.getPropertyValue('--spec-bg').trim() || '#04060f';
+        const grid = cs.getPropertyValue('--spec-grid').trim() || '#1d3a63';
+        const dimCol = cs.getPropertyValue('--ink-dim').trim() || '#8fc3ee';
+        const col = CH_COLORS[cuCh % CH_COLORS.length];
+        const P = cuData.pitch, N = cuData.nominal, V = cuData.vol, n = P.length;
+        const dim = anSetupCanvas(pc), W = dim[0], H = dim[1], dpr = dim[2];
+        const g = pc.getContext('2d'); if (!g) return;
+        g.fillStyle = bg; g.fillRect(0, 0, W, H);
+        let lo = Infinity, hi = -Infinity;
+        for (let i = 0; i < n; i++) {
+          if (P[i] != null) { if (P[i] < lo) lo = P[i]; if (P[i] > hi) hi = P[i]; }
+          if (N[i] != null) { if (N[i] < lo) lo = N[i]; if (N[i] > hi) hi = N[i]; }
+        }
+        if (!isFinite(lo)) { lo = 57; hi = 69; }
+        lo = Math.floor(lo) - 1; hi = Math.ceil(hi) + 1;
+        if (hi - lo < 4) { hi += 2; lo -= 2; }
+        const yOf = (v) => H - (v - lo) / (hi - lo) * (H - 8 * dpr) - 4 * dpr;
+        const xOf = (i) => n <= 1 ? W / 2 : i / (n - 1) * (W - 1);
+        g.strokeStyle = grid; g.lineWidth = 1;
+        g.fillStyle = dimCol;
+        g.font = Math.round(9 * dpr) + 'px ui-monospace, Menlo, monospace';
+        for (let m = lo; m <= hi; m++) {
+          const yy = Math.round(yOf(m)) + 0.5;
+          g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke();
+          g.fillText(noteNameOf(m), 3 * dpr, Math.max(9 * dpr, yy - 2 * dpr));
+        }
+        g.strokeStyle = dimCol; g.lineWidth = 1; g.setLineDash([4 * dpr, 3 * dpr]);
+        g.beginPath();
+        let pen = false;
+        for (let i = 0; i < n; i++) {
+          if (N[i] == null) { pen = false; continue; }
+          if (!pen) { g.moveTo(xOf(i), yOf(N[i])); pen = true; } else g.lineTo(xOf(i), yOf(N[i]));
+        }
+        g.stroke(); g.setLineDash([]);
+        g.strokeStyle = col; g.lineWidth = Math.max(1.5, 1.4 * dpr);
+        g.beginPath(); pen = false;
+        for (let i = 0; i < n; i++) {
+          if (P[i] == null) { pen = false; continue; }
+          if (!pen) { g.moveTo(xOf(i), yOf(P[i])); pen = true; } else g.lineTo(xOf(i), yOf(P[i]));
+        }
+        g.stroke();
+        const dim2 = anSetupCanvas(vc), W2 = dim2[0], H2 = dim2[1];
+        const g2 = vc.getContext('2d'); if (!g2) return;
+        g2.fillStyle = bg; g2.fillRect(0, 0, W2, H2);
+        g2.strokeStyle = grid; g2.lineWidth = 1;
+        for (let q = 1; q <= 3; q++) {
+          const yy = Math.round(H2 * q / 4) + 0.5;
+          g2.beginPath(); g2.moveTo(0, yy); g2.lineTo(W2, yy); g2.stroke();
+        }
+        let vmax = 0.25;
+        for (let i = 0; i < V.length; i++) if (V[i] > vmax) vmax = V[i];
+        g2.fillStyle = dimCol;
+        g2.font = Math.round(9 * dpr) + 'px ui-monospace, Menlo, monospace';
+        g2.fillText('max ' + vmax.toFixed(2), 3 * dpr, 10 * dpr);
+        g2.strokeStyle = col; g2.lineWidth = Math.max(1.5, 1.4 * dpr);
+        g2.beginPath();
+        for (let i = 0; i < V.length; i++) {
+          const vv = Math.min(1, Math.max(0, (V[i] || 0) / vmax));
+          const xx = V.length <= 1 ? W2 / 2 : i / (V.length - 1) * (W2 - 1);
+          const yy = H2 - vv * (H2 - 6 * dpr) - 3 * dpr;
+          if (i === 0) g2.moveTo(xx, yy); else g2.lineTo(xx, yy);
+        }
+        g2.stroke();
+      }
+      function cuRequestAnalysis() {
+        if (cuCh == null || !els.cuPanel || els.cuPanel.hidden) return;
+        if (backend === 'worklet' && workletNode) {
+          workletNode.port.postMessage({ type: 'analysis', ch: cuCh });
+        } else if (backend === 'script' && localPlayer) {
+          cuRenderAnalysis(localPlayer.getAnalysis(cuCh));
+        } else if (cur.mdx) {
+          ensureAudio().then(() => { if (cuCh != null) cuRequestAnalysis(); });
+        }
+      }
+      function cuRenderAnalysis(data) {
+        if (cuCh == null || !data || data.ch !== cuCh) return;
+        cuData = data;
+        cuMtTuner.target = (typeof data.detuneCents === 'number' && isFinite(data.detuneCents))
+          ? Math.max(-650, Math.min(650, data.detuneCents)) : null;
+        cuMtVu.target = vuFracFromVol(data.vol.length ? data.vol[data.vol.length - 1] : 0);
+        cuDrawCuTraces();
+      }
+      /* ---- voice parameters (voice-detail report, as v24) ---- */
+      function cuClearVoiceCells() {
+        for (let p = 0; p < cuCells.length; p++) {
+          for (let o = 0; o < 4; o++) {
+            if (cuCellTxt[p][o] !== '—') { cuCellTxt[p][o] = '—'; cuCells[p][o].textContent = '—'; }
+          }
+        }
+      }
+      function cuRefreshVoicePane() {
+        if (cuCh == null) return;
+        if (cuCh >= 8) {
+          /* PCM channels have no FM voice — the same treatment as
+           * the voice detail panel, which PCM rows never open. */
+          cuSet('vnum', els.cuNum, '—'); cuSet('valg', els.cuAlg, '—'); cuSet('vfb', els.cuFb, '—');
+          cuSet('vmeta', els.cuVoiceMeta, anChLabel(cuCh) + ' は PCM チャンネルです。FM 音色パラメータはありません（音色番号は PDX サンプルの番号です）。');
+          cuClearVoiceCells();
+        } else if (cuVoiceNum == null) {
+          cuSet('vmeta', els.cuVoiceMeta, anChLabel(cuCh) + ' の現在音色のパラメータです（エンジンが読み込んだ @ 定義そのもの）。');
+        }
+      }
+      function cuRequestVoiceDetail() {
+        if (cuCh == null || cuCh >= 8 || !els.cuPanel || els.cuPanel.hidden) return;
+        if (backend === 'worklet' && workletNode) {
+          workletNode.port.postMessage({ type: 'voicedetail', ch: cuCh });
+        } else if (backend === 'script' && localPlayer) {
+          cuRenderVoiceDetail(localPlayer.getVoiceDetail(cuCh));
+        } else if (cur.mdx) {
+          ensureAudio().then(() => { if (cuCh != null) cuRequestVoiceDetail(); });
+        }
+      }
+      function cuRenderVoiceDetail(detail) {
+        if (cuCh == null || cuCh >= 8 || !detail || detail.ch !== cuCh) return;
+        cuVoiceNum = (typeof detail.voiceNum === 'number') ? detail.voiceNum : null;
+        const chLabel = anChLabel(cuCh);
+        if (!detail.found) {
+          cuSet('vnum', els.cuNum, '@' + detail.voiceNum); cuSet('valg', els.cuAlg, '—'); cuSet('vfb', els.cuFb, '—');
+          cuSet('vmeta', els.cuVoiceMeta, chLabel + ' の音色 @' + detail.voiceNum + ' は、この曲に定義されていません。');
+          cuClearVoiceCells();
+          return;
+        }
+        cuSet('vnum', els.cuNum, '@' + detail.voiceNum);
+        cuSet('valg', els.cuAlg, String(detail.alg));
+        cuSet('vfb', els.cuFb, String(detail.fb));
+        cuSet('vmeta', els.cuVoiceMeta, chLabel + ' の現在音色 @' + detail.voiceNum + '（エンジンが読み込んだ @ 定義そのもの）');
+        for (let p = 0; p < VOICE_PARAMS.length; p++) {
+          const key = VOICE_PARAMS[p][1];
+          for (let o = 0; o < 4; o++) {
+            const txt = String(detail.ops[o][key]);
+            if (cuCellTxt[p][o] !== txt) { cuCellTxt[p][o] = txt; cuCells[p][o].textContent = txt; }
+          }
+        }
+      }
+      /* ---- follow state reports (called from showState) ---- */
+      function cuFollowState(s) {
+        cuState = s || null;
+        cuPlaying = !!(s && s.playing && !s.ended);
+        if (cuCh == null || !els.cuPanel || els.cuPanel.hidden) { cuMeterSync(); return; }
+        cuUpdateHeader(s);
+        cuDrawKeyboard();
+        cuMeterSync();
+        if (!cuPlaying) return;
+        cuRequestAnalysis();
+        if (s.voices) {
+          const v = s.voices[cuCh];
+          if (typeof v === 'number' && v !== cuVoiceNum) cuRequestVoiceDetail();
+        }
+      }
+      window.addEventListener('resize', () => {
+        if (cuCh != null && els.cuPanel && !els.cuPanel.hidden) { cuDrawKeyboard(); if (cuData) cuDrawCuTraces(); else cuDrawCuMeters(); }
+      });
+      window.__mdxCloseup = {
+        getState: () => ({ open: !!(els.cuPanel && !els.cuPanel.hidden), ch: cuCh, suppressedKey: cuSuppressedKey, positioned: cuPositioned, draws: cuDraws, meterDraws: cuMeterDraws, playing: cuPlaying })
+      };
       /* ---------------- playback progress bar (v36) ----------------
        * [PROG-START] Display-only: a thin horizontal bar in the NOW
        * PLAYING panel showing the position inside one pass of the
@@ -3977,6 +4542,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         updateChannelVoicePan(s);
         voicePanelFollow(s);
         analysisFollow(s);
+        cuFollowState(s);
         /* Spectrum follows the authoritative playback state: it
          * draws only while playing and stops on pause/stop/end. */
         if (s.playing && !s.ended) specStart(); else specStop();
@@ -4332,8 +4898,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             if (m.type === 'state') showState(m);
             else if (m.type === 'error') setStatus('再生エラー: ' + m.message);
             else if (m.type === 'loaded' && m.nTracks) buildChannels(m.nTracks);
-            else if (m.type === 'voicedetail') renderVoiceDetail(m.detail);
-            else if (m.type === 'analysis') renderAnalysis(m.data);
+            else if (m.type === 'voicedetail') { renderVoiceDetail(m.detail); cuRenderVoiceDetail(m.detail); }
+            else if (m.type === 'analysis') { renderAnalysis(m.data); cuRenderAnalysis(m.data); }
             else if (m.type === 'wasm-ready') { if (fmResolve) fmResolve('ready'); }
             else if (m.type === 'wasm-error') { workletFmError = m.message || ''; if (fmResolve) fmResolve('error'); }
           };
