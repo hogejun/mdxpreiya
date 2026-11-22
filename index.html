@@ -5513,7 +5513,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          list is rebuilt and re-sorted, the position is re-located
          from the current song so playback continues where it was. */
       let seqActive = false;     /* folder sequential mode ON/OFF */
-      let seqParked = false;     /* parked by the stop button: mode and
+      let seqParked = false;     /* parked (by the stop button, at
+       * the last song, or when a skip runs out of songs): mode and
        * position are kept (the list UI stays visible) and playback
        * resumes from the parked song via the play button, or moves
        * with the prev/next buttons. Only a load from outside the
@@ -5522,6 +5523,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let seqCurrentEnt = null;  /* file object of the current song */
       let seqCurrentKey = '';    /* key of the current song (fallback) */
       let seqBusy = false;       /* re-entry guard while a song load is in flight */
+      let seqStopRequested = false; /* stop pressed while a sequential
+       * load was in flight: the stop command the button sent raced
+       * the load and is overwritten when the load commits, so the
+       * request is remembered here and honoured by playSeqAt when
+       * the load completes (park at the loaded song, stopped). */
       let seqBaseLoop = null;    /* loopCount when the current song started */
       /* After a sequential load commits, state reports from the
        * PREVIOUS song can still be in flight (above all its
@@ -5786,7 +5792,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * natural end; read by the UI script's natural-end suspend
        * decision (kept under the existing __mdxContModeOn name). */
       function updateAdvanceFlag() {
-        window.__mdxContModeOn = contMode || (seqActive && seqIndex < folderSongs.length - 1);
+        /* Parked means nothing is playing and nothing will
+         * advance, so the flag is false while parked; it is
+         * recomputed (and restored) on resume / song start. */
+        window.__mdxContModeOn = contMode || (seqActive && !seqParked && seqIndex < folderSongs.length - 1);
       }
       function setContMode(on) {
         if (on && !DEBUG_ON) on = false; /* random is debug-only */
@@ -5817,6 +5826,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       window.__mdxStopModes = function () {
         if (contMode) { window.__mdxRandomOff(); return; }
         if (!seqActive) return;
+        /* A sequential load is in flight: remember the stop so
+         * playSeqAt can honour it when the load commits instead
+         * of starting playback (see seqStopRequested). */
+        if (seqBusy) seqStopRequested = true;
         seqParked = true;
         seqBaseLoop = null; /* re-captured by the state hook on resume */
         seqAwaitConfirm = false; seqSwallowedEnd = false;
@@ -5906,6 +5919,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       function stopSequential(msg) {
         seqActive = false; seqParked = false; seqIndex = -1;
         seqCurrentEnt = null; seqCurrentKey = ''; seqBaseLoop = null;
+        seqStopRequested = false;
         seqAwaitConfirm = false; seqSwallowedEnd = false;
         if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
         updateSeqUi(); updateAdvanceFlag();
@@ -5916,13 +5930,27 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * (dir -1 for 「前の曲」, +1 otherwise): skipping forward
        * unconditionally walked the position AWAY from a 「前の曲」
        * target — past the current song and beyond — whenever the
-       * target could not be read. 10 failures in a row (the
-       * continuous-random attempt limit, reused) or running off
-       * the end of the list in the direction of travel stops the
-       * mode. */
+       * target could not be read. When a song does start after
+       * skips, the 「再生中」 status names how many songs were
+       * skipped, so the jump stays visible.
+       * When NO song can be started — 10 failures in a row (the
+       * continuous-random attempt limit, reused), or the skip
+       * ran off the end of the list in the direction of travel —
+       * the mode does NOT end: the position returns to the song
+       * the skip started from, playback is stopped through the
+       * stop button, and the mode parks there, exactly like a
+       * plain stop. (Ending the mode here lost the position and
+       * the prev/next buttons, and left a looped previous song
+       * playing on under an "all songs played" message.) The
+       * return is by the song itself (file identity, key as
+       * fallback), never by number: folders added mid-skip can
+       * rebuild and re-sort the list, and the display (n / N
+       * and path) must come back showing that same song. */
       async function playSeqAt(idx, dir) {
         if (seqBusy || !seqActive) return false;
         const step = dir < 0 ? -1 : 1;
+        const startIdx = idx;
+        const originEnt = seqCurrentEnt, originKey = seqCurrentKey;
         seqBusy = true;
         try {
           let fails = 0;
@@ -5933,6 +5961,24 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             seqBaseLoop = null;
             updateSeqUi(); updateAdvanceFlag();
             if (await playFolderEntry(folderSongs[idx])) {
+              if (seqStopRequested) {
+                /* Stop was pressed while this song was loading:
+                 * honour it now that the load has committed —
+                 * park at the loaded song instead of starting
+                 * playback. The stop command the button already
+                 * sent raced the load and was overwritten by it,
+                 * so stop again through the button (its handler
+                 * also parks via __mdxStopModes). The position
+                 * stays on the loaded song; play resumes it. */
+                seqStopRequested = false;
+                seqParked = true; seqBaseLoop = null;
+                updateSeqUi(); updateAdvanceFlag();
+                const sbStop = $('btnStop');
+                if (sbStop) sbStop.click();
+                seqStopRequested = false; /* that click was ours, not a new request */
+                if (fails > 0) setRandStatus(catEls.rStatus.textContent + '（読み込めない ' + fails + ' 曲を飛ばしました）');
+                return true;
+              }
               seqParked = false; /* a song starting (again) un-parks the mode */
               /* Arm the state hook's hold-off window: reports
                * from the previous song may still be in flight
@@ -5953,14 +5999,39 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
                 if (seqSwallowedEnd && seqActive) { seqSwallowedEnd = false; advanceSequential(); }
                 seqSwallowedEnd = false;
               }, 2500);
+              if (fails > 0) setRandStatus(catEls.rStatus.textContent + '（読み込めない ' + fails + ' 曲を飛ばしました）');
               return true;
             }
             if (!seqActive) return false; /* cancelled while loading */
             fails++; idx += step;
           }
-          if (fails >= 10) stopSequential('読み込めない曲が続いたため、フォルダ順次再生を終了しました。');
-          else if (step < 0) stopSequential('読み込める曲が前にないため、フォルダ順次再生を終了しました。');
-          else stopSequential('フォルダ内の曲をすべて再生しました。');
+          /* No song could be started: restore the position to
+           * the song the skip started from (identity first, key
+           * as fallback; with no origin song — a fresh start
+           * whose head songs all failed — park at the attempted
+           * head position), stop playback and park there. */
+          let oi = originEnt ? folderSongs.findIndex((s) => s.ent === originEnt) : -1;
+          if (oi < 0 && originKey) oi = folderSongs.findIndex((s) => s.key === originKey);
+          if (oi < 0) oi = Math.min(Math.max(startIdx, 0), folderSongs.length - 1);
+          if (oi >= 0 && folderSongs[oi]) {
+            seqIndex = oi;
+            seqCurrentEnt = folderSongs[oi].ent;
+            seqCurrentKey = folderSongs[oi].key;
+          }
+          seqParked = true; seqBaseLoop = null;
+          seqAwaitConfirm = false; seqSwallowedEnd = false;
+          if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
+          seqStopRequested = false;
+          updateSeqUi(); updateAdvanceFlag();
+          const sb = $('btnStop');
+          if (sb) sb.click(); /* stops the engine — a looped previous song must not keep playing — and parks via __mdxStopModes */
+          seqStopRequested = false; /* that click was ours, not a request during a load */
+          let msg;
+          if (fails >= 10) msg = '読み込めない曲が続いたため、元の位置に戻って停止しました。';
+          else if (step < 0) msg = '読み込める曲が前にないため、元の位置に戻って停止しました。';
+          else msg = 'フォルダ内の曲をすべて再生しました。元の位置に戻って停止しました。';
+          if (fails > 0) msg += '（読み込めない ' + fails + ' 曲を飛ばしました）';
+          setRandStatus(msg);
           return false;
         } finally { seqBusy = false; }
       }
