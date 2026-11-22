@@ -1542,6 +1542,15 @@ function MdxPlayer(sampleRate) {
   this.chMute = []; this.chSolo = []; this._anySolo = false; /* per-channel mute/solo, set via setMuteSolo; all-false keeps the pre-mute/solo rendering path bit-identical */
   this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeSpeed = 0; this.fadeCounter = 0;
   this.pcmPan = 3;
+  /* pcm8Mode: MXDRV's driver-global PCM8 flag (L001df4) as runtime
+   * state. Down at load / resetPlayback, set only when an E8 command
+   * executes (see parseEvent case 0xE8); until then PCM plays as
+   * normal ADPCM — @ selects no bank and the PCM8 volume table does
+   * not apply — whatever parseMDX's isPCM8 heuristic (16 tracks /
+   * leading E8) says. That heuristic now serves display / info use
+   * only. One flag for the whole player, not per track, and in-song
+   * loop jumps (F1 / F5) do not clear it. */
+  this.pcm8Mode = false;
   /* X68Sound shared ADPCM output stage state (stereo, 62.5 kHz) */
   this.adS1 = [0, 0]; this.adS2 = [0, 0];
   this.adY1 = [0, 0]; this.adY2 = [0, 0];
@@ -1551,7 +1560,7 @@ function MdxPlayer(sampleRate) {
   this.errors = [];
   this.noteCounts = [];
   this.trace = []; /* v25: per-track pitch/volume ring buffers (report-only, see _tracePush) */
-  this.pcmUsage = {}; /* bank (the @ value on a PCM8 song, 0 on a normal ADPCM song — see _pcmStart) -> Set of sounded sample numbers */
+  this.pcmUsage = {}; /* bank (the @ value while PCM8 mode is on, 0 in normal ADPCM — see _pcmStart) -> Set of sounded sample numbers */
   this.samplesToNextTick = 0;
   this.started = false;
 }
@@ -1594,6 +1603,10 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.ended = false; this.loopCount = 0;
   this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeCounter = 0;
   this.pcmPan = 3;
+  /* PCM8 mode starts OFF on every load / restart: MXDRV enters it
+   * only when an E8 command executes. In-song loop jumps never pass
+   * through here, so the flag survives them, as in MXDRV. */
+  this.pcm8Mode = false;
   this.adS1 = [0, 0]; this.adS2 = [0, 0];
   this.adY1 = [0, 0]; this.adY2 = [0, 0];
   this.adYp = [0, 0]; this.adZ = [0, 0];
@@ -1844,33 +1857,36 @@ function mdxPcmSampleNum(noteNum, detune) {
   return ((noteNum << 6) + 5 + detune) >> 6;
 }
 MdxPlayer.prototype._pcmStart = function (t, noteNum, sampleNumHeld) {
-  /* Which PDX bank the sample comes from depends on the song
-   * type. On a PCM channel MXDRV's FD handler merely stores the
-   * operand byte verbatim (S0004_b); that stored value is read
-   * back as a bank only in PCM8 mode — entry index = sample +
-   * @ * 96 (L000f28) — which is exactly the bank argument of
-   * pdxDecodeTone / pdxToneRawPCM here. This player treats a
-   * song as PCM8 when parseMDX judges it so (isPCM8: 16 tracks,
-   * or a leading E8) and its tracks 9-16 already play as PCM
-   * with the PCM8 volume table, so on such a song the @ value
-   * selects the bank, as the full byte with no masking
-   * (pdxDecodeTone returns null for a bank the PDX does not
-   * have, so an out-of-range @ is simply silent). MXDRV's exact
-   * condition is "E8 executed with a PCM8 driver resident";
-   * isPCM8 is an approximation of it that serves in practice.
-   * In normal ADPCM the stored @ is never read back and the
-   * sample always comes from the PDX's first bank. (Before v49
-   * the player passed voiceNum & 0x0F as a bank index in every
-   * mode, so on a single-bank PDX any PCM @n with n > 0 silenced
-   * the rest of the track — one song after its FD 04 at tick 433;
-   * v49 then read bank 0 even on PCM8 songs, losing their bank
-   * switching; v50 selects the bank by song type as above.)
+  /* Which PDX bank the sample comes from depends on the runtime
+   * PCM8 mode flag (this.pcm8Mode). On a PCM channel MXDRV's FD
+   * handler merely stores the operand byte verbatim (S0004_b);
+   * that stored value is read back as a bank only in PCM8 mode —
+   * entry index = sample + @ * 96 (L000f28) — which is exactly
+   * the bank argument of pdxDecodeTone / pdxToneRawPCM here.
+   * MXDRV enters PCM8 mode only when an E8 command executes
+   * (its handler sets the driver-global flag L001df4), so this
+   * player does the same: pcm8Mode starts down at resetPlayback
+   * and the E8 handler in parseEvent raises it. While it is up
+   * the @ value selects the bank, as the full byte with no
+   * masking (pdxDecodeTone returns null for a bank the PDX does
+   * not have, so an out-of-range @ is simply silent). Until an
+   * E8 executes — including on a 16-track song parseMDX's isPCM8
+   * heuristic calls PCM8 — the stored @ is never read back and
+   * the sample always comes from the PDX's first bank, i.e.
+   * normal ADPCM. (isPCM8 remains for display / info use only.
+   * History: before v49 the player passed voiceNum & 0x0F as a
+   * bank index in every mode, so on a single-bank PDX any PCM
+   * @n with n > 0 silenced the rest of the track — one song after
+   * its FD 04 at tick 433; v49 then read bank 0 even on PCM8
+   * songs, losing their bank switching; v50 selected the bank
+   * by song type (isPCM8); the runtime flag replaced that
+   * approximation on 2026-11-22.)
    * sampleNumHeld, when given, is the sample number captured at
    * note-on (t.pcmSampleNum / t.pendingSampleNum): an E7 05
    * direct key-on and an F0-delayed start use it as-is instead
    * of recomputing from the then-current detune, because MXDRV
    * keeps the key value (S0012) from when the note was read. */
-  var bank = this.song.isPCM8 ? t.voiceNum : 0;
+  var bank = this.pcm8Mode ? t.voiceNum : 0;
   var sampleNum = (typeof sampleNumHeld === 'number') ? sampleNumHeld : mdxPcmSampleNum(noteNum, t.detune);
   /* MXDRV judges a PCM retrigger by the key-on state, not by
    * whether the previous sample is still sounding: a note that
@@ -1921,11 +1937,11 @@ MdxPlayer.prototype.noteOn = function (t, noteNum, count) {
     /* Usage record: the sample number this note-on actually
      * addresses — the key-value-derived number _pcmStart looks
      * up — recorded under the same bank _pcmStart draws from
-     * (the @ value on a PCM8 song, bank 0 in normal ADPCM; see
-     * _pcmStart). Report-only. */
+     * (the @ value while PCM8 mode is on, bank 0 in normal
+     * ADPCM; see _pcmStart). Report-only. */
     var sampleNum = mdxPcmSampleNum(noteNum, t.detune);
     t.pcmSampleNum = sampleNum;
-    var bank = this.song.isPCM8 ? t.voiceNum : 0;
+    var bank = this.pcm8Mode ? t.voiceNum : 0;
     if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
     this.pcmUsage[bank].add(sampleNum);
     if (!t.pcmKeyOn) {
@@ -2030,10 +2046,10 @@ MdxPlayer.prototype.parseEvent = function (t) {
        * byte verbatim in S0004_b — no range check, no flags —
        * so the full byte is kept here too (values >= 16 are no
        * longer dropped). The stored value is read back only by
-       * _pcmStart, and only on a PCM8 song, where it selects
-       * the PDX bank; normal ADPCM never reads it back (see
-       * _pcmStart). FM: the voice number, applied by applyVoice
-       * as before. */
+       * _pcmStart, and only while PCM8 mode is on (an E8 has
+       * executed), where it selects the PDX bank; in normal
+       * ADPCM it is never read back (see _pcmStart). FM: the
+       * voice number, applied by applyVoice as before. */
       t.voiceNum = v;
       if (!t.isPCM) t.voiceDirty = true;
       return 0;
@@ -2183,7 +2199,20 @@ MdxPlayer.prototype.parseEvent = function (t) {
     }
     case 0xE9: /* LFO delay */
       v = d[t.ptr++]; t.lfoDelay = v; return 0;
-    case 0xE8: /* PCM8 mode marker */
+    case 0xE8: /* PCM8 mode: MXDRV's handler sets the driver-global
+      * PCM8 flag (L001df4). From this point on, PCM @ selects a PDX
+      * bank and the PCM8 volume table applies (see _pcmStart /
+      * pcmNativeInto); before any E8 executes, the song plays as
+      * normal ADPCM. The flag is player-global, not per-track, is
+      * cleared only by resetPlayback (load / restart), and survives
+      * in-song loop jumps (F1 / F5). An E8 delivered to another
+      * track via E7 04 also raises it, since it arrives here
+      * through parseEvent like any other event. There is no
+      * channel-count cap here: tracks 10-16 keep being processed
+      * while the flag is down (a full-collection scan found no
+      * song whose only E8 sits in tracks 10-16, so the flag alone
+      * matches MXDRV on every song that exists in the scan). */
+      this.pcm8Mode = true;
       return 0;
     case 0xE7: { /* MXDRV extension command: dispatch on the 2nd
       * byte (mxdrv.cpp L001694, branch table L0016aa); the
@@ -2332,7 +2361,7 @@ MdxPlayer.prototype.parseEvent = function (t) {
              * key-on starts. The usage record goes under the same
              * bank _pcmStart draws from (see _pcmStart). */
             var sampleNum = t.pcmSampleNum;
-            var bank = this.song.isPCM8 ? t.voiceNum : 0;
+            var bank = this.pcm8Mode ? t.voiceNum : 0;
             if (!this.pcmUsage[bank]) this.pcmUsage[bank] = new Set();
             this.pcmUsage[bank].add(sampleNum);
             if (!t.pcmKeyOn) this._pcmStart(t, t.note, sampleNum);
@@ -2525,10 +2554,11 @@ MdxPlayer.prototype.pcmNativeInto = function (ym) {
     t.pcmInpPrev = inp;
     t.pcmF2 = t.pcmF1 - t.pcmF1Prev + t.pcmF2 - t.pcmF2 / 256 - t.pcmF2 / 512 - t.pcmF2 / 4096;
     t.pcmF1Prev = t.pcmF1;
-    /* PCM volume follows MXDRV, not the FM volume scale: on a
-     * PCM8 song the track's v-index (0-15) indexes PCM8_VOL_TBL
-     * directly, and on a classic (non-PCM8) song the single ADPCM
-     * channel has no volume control at all (fixed index 8).
+    /* PCM volume follows MXDRV, not the FM volume scale: while
+     * PCM8 mode is on (an E8 has executed) the track's v-index
+     * (0-15) indexes PCM8_VOL_TBL directly, and in normal ADPCM
+     * (before any E8) the single ADPCM channel has no volume
+     * control at all (fixed index 8).
      * The previous code rescaled the FM-style 0-127 volume back
      * into an index, which turned the v9 some PCM8 songs set into
      * index 13 (table gain 3.0 instead of 1.25) and made their
@@ -2539,7 +2569,7 @@ MdxPlayer.prototype.pcmNativeInto = function (ym) {
      * fadeAtten the FM side adds to its carrier TLs, replacing the
      * old MDX_MASTER_VOL_TABLE factor) keeps the MXDRV fade
      * working on the PCM side with the same envelope as FM. */
-    var vi = (this.song && this.song.isPCM8) ? t.pcmVolIndex : 8;
+    var vi = this.pcm8Mode ? t.pcmVolIndex : 8;
     var voice = (t.pcmF2 / 512) * (PCM8_VOL_TBL[vi] / 16) * fadeGain;
     var a = voice < 0 ? -voice : voice;
     if (a / 524288 > t.pcmLevel) t.pcmLevel = a / 524288;
