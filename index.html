@@ -688,6 +688,11 @@
             <div class="stat"><div class="k">現在のノート</div><div class="v" id="cuStatNote">—</div></div>
           </div>
         </div>
+        <div class="cu-readout" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+          <div class="stat"><div class="k">実効ピッチ (MIDI)</div><div class="v" id="cuStatPitch">—</div></div>
+          <div class="stat"><div class="k">デチューン設定 (F3)</div><div class="v" id="cuStatDetuneSet">—</div></div>
+          <div class="stat"><div class="k">ポルタメント (F2)</div><div class="v" id="cuStatPorta">—</div></div>
+        </div>
         <p class="anlabel">鍵盤（現在音を中心に ±2 オクターブ／緑のマーカーはピッチの寄り）</p>
         <div class="cu-kbwrap"><canvas id="cuKbCanvas" aria-hidden="true"></canvas></div>
         <div class="cu-meters">
@@ -704,6 +709,11 @@
         <div class="anwrap"><canvas id="cuPitchCanvas" aria-hidden="true"></canvas></div>
         <p class="anlabel">音量トレース</p>
         <div class="anwrap"><canvas id="cuVolCanvas" aria-hidden="true"></canvas></div>
+        <div class="anlfo">
+          <div class="stat"><div class="k">ピッチ LFO（EC）</div><div class="v" id="cuLfoPitch">—</div></div>
+          <div class="stat"><div class="k">音量 LFO（EB）</div><div class="v" id="cuLfoVol">—</div></div>
+          <div class="stat"><div class="k">LFO ディレイ（E9）</div><div class="v" id="cuLfoDelay">—</div></div>
+        </div>
         <p class="anlabel">音色パラメータ</p>
         <p class="chhelp" id="cuVoiceMeta">—</p>
         <div class="cu-readout" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
@@ -3069,6 +3079,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         anLfoPitch: $('anLfoPitch'), anLfoVol: $('anLfoVol'), anLfoDelay: $('anLfoDelay'),
         cuPanel: $('closeupPanel'), cuTitle: $('cuTitle'), cuClose: $('btnCuClose'), cuDrag: $('cuDragHandle'),
         cuCh: $('cuStatCh'), cuVoice: $('cuStatVoice'), cuPan: $('cuStatPan'), cuNote: $('cuStatNote'),
+        cuPitch: $('cuStatPitch'), cuDetuneSet: $('cuStatDetuneSet'), cuPorta: $('cuStatPorta'),
+        cuLfoPitch: $('cuLfoPitch'), cuLfoVol: $('cuLfoVol'), cuLfoDelay: $('cuLfoDelay'),
         cuKbCv: $('cuKbCanvas'), cuTunerCv: $('cuTunerCanvas'), cuVuCv: $('cuVuCanvas'),
         cuPitchCv: $('cuPitchCanvas'), cuVolCv: $('cuVolCanvas'),
         cuVoiceMeta: $('cuVoiceMeta'), cuVoiceTbody: $('cuVoiceTbody'),
@@ -4051,7 +4063,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       function cuShow(ch) {
         const changed = cuCh !== ch;
         cuCh = ch; cuData = null;
-        if (changed) { cuVoiceNum = null; cuKbCenter = 60; cuMeterResetTargets(); cuClearVoiceCells(); }
+        if (changed) {
+          cuVoiceNum = null; cuKbCenter = 60; cuMeterResetTargets(); cuClearVoiceCells();
+          cuSet('pitch', els.cuPitch, '—'); cuSet('dset', els.cuDetuneSet, '—'); cuSet('porta', els.cuPorta, '—');
+          cuSet('lfop', els.cuLfoPitch, '—'); cuSet('lfov', els.cuLfoVol, '—'); cuSet('lfod', els.cuLfoDelay, '—');
+        }
         els.cuPanel.hidden = false;
         const title = 'ソロ・クローズアップ — ' + anChLabel(ch);
         if (els.cuTitle.textContent !== title) els.cuTitle.textContent = title;
@@ -4072,11 +4088,29 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const c = els.consolePanel;
         if (c) {
           const r = c.getBoundingClientRect();
-          left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + (r.width - w) / 2));
-          top = Math.max(8, Math.min(window.innerHeight - 60, r.top + Math.max(0, (r.height - h) / 2)));
+          left = r.left + (r.width - w) / 2;
+          top = r.top + Math.max(0, (r.height - h) / 2);
         }
+        /* Keep the whole panel on screen: the top edge may not go
+         * below (viewport height − panel height − 8), so on short
+         * viewports the panel starts at 8 instead of hanging off
+         * the bottom edge. */
+        left = Math.max(8, Math.min(Math.max(8, window.innerWidth - w - 8), left));
+        top = Math.max(8, Math.min(Math.max(8, window.innerHeight - h - 8), top));
         p.style.left = left + 'px'; p.style.top = top + 'px';
         cuPositioned = true;
+      }
+      /* Re-apply the on-screen limits to the current position
+       * (used on window resize): the top edge obeys the same
+       * (viewport height − panel height − 8) cap as the initial
+       * placement; the left edge keeps the drag-time limits so a
+       * deliberately half-parked panel stays reachable. */
+      function cuClampPosition() {
+        const p = els.cuPanel; if (!p || p.hidden) return;
+        const w = p.offsetWidth || 720, h = p.offsetHeight || 300;
+        const left = parseFloat(p.style.left), top = parseFloat(p.style.top);
+        if (isFinite(left)) p.style.left = Math.max(-w + 90, Math.min(window.innerWidth - 90, left)) + 'px';
+        if (isFinite(top)) p.style.top = Math.max(8, Math.min(Math.max(8, window.innerHeight - h - 8), top)) + 'px';
       }
       /* Drag by the header (the × button is excluded). Pointer
        * capture keeps the drag alive outside the panel; the panel
@@ -4101,10 +4135,17 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         els.cuDrag.addEventListener('pointerup', cuDragEnd);
         els.cuDrag.addEventListener('pointercancel', cuDragEnd);
       }
-      if (els.cuClose) els.cuClose.addEventListener('click', () => {
-        /* Suppress for the current solo composition only. */
+      /* Close for now: suppress for the current solo composition
+       * only (the × button and Esc share this behaviour). */
+      function cuSuppressAndHide() {
         cuSuppressedKey = cuSoloIndices().join(',');
         cuHide();
+      }
+      if (els.cuClose) els.cuClose.addEventListener('click', cuSuppressAndHide);
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' && e.key !== 'Esc') return;
+        if (cuCh == null || !els.cuPanel || els.cuPanel.hidden) return;
+        cuSuppressAndHide();
       });
       /* ---- header chips + big keyboard (from state reports) ---- */
       function cuUpdateHeader(s) {
@@ -4165,11 +4206,31 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           g.strokeRect((i + 1) * ww - bw / 2 + 0.5, 0.5, bw - 1, H * 0.62 - 1);
         }
         g.textAlign = 'left';
-        /* pitch-bend marker: a cyan line at the EXACT pitch in
-         * pitch space, so its offset from the lit key's centre
-         * reads directly as the bend / detune amount. */
+        /* Centre x of the key for MIDI note m in the layout drawn
+         * above: white keys are equal-width, so a white key's centre
+         * is (its index among the whites + 0.5) * ww, and a black
+         * key sits centred on the boundary after the white below it.
+         * Notes just outside the drawn range extrapolate by
+         * counting whites past the edge. */
+        const keyCenterX = (m) => {
+          if (isWhite(m)) {
+            const i = whites.indexOf(m);
+            if (i >= 0) return (i + 0.5) * ww;
+            if (m < lo) { let c = 0; for (let k = m; k < lo; k++) if (isWhite(k)) c++; return (0.5 - c) * ww; }
+            let c = 0; for (let k = hi + 1; k <= m; k++) if (isWhite(k)) c++;
+            return (whites.length - 0.5 + c) * ww;
+          }
+          return keyCenterX(m - 1) + ww / 2;
+        };
+        /* pitch-bend marker: a cyan line at the exact pitch, placed
+         * along the KEY layout (not an equal-semitone grid): the
+         * centres of the two semitone keys bracketing the pitch,
+         * interpolated by the fractional part. At zero detune the
+         * line lands exactly on the lit key's centre, so its offset
+         * from that centre reads directly as the bend / detune. */
         if (note != null) {
-          const x = (note - lo + 0.5) / (hi - lo + 1) * W;
+          const fl = Math.floor(note), fr = note - fl;
+          const x = keyCenterX(fl) + fr * (keyCenterX(fl + 1) - keyCenterX(fl));
           g.strokeStyle = accent; g.lineWidth = Math.max(2, 2 * dpr);
           g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
           const cents = Math.round((note - near) * 100);
@@ -4374,6 +4435,22 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         cuMtTuner.target = (typeof data.detuneCents === 'number' && isFinite(data.detuneCents))
           ? Math.max(-650, Math.min(650, data.detuneCents)) : null;
         cuMtVu.target = vuFracFromVol(data.vol.length ? data.vol[data.vol.length - 1] : 0);
+        /* Numeric readouts, same data and formats as the analysis
+         * panel (v25): effective pitch, F3 detune setting, F2
+         * portamento and the three LFO readouts (EC / EB / E9).
+         * They ride on the analysis response the close-up already
+         * requests — no extra engine traffic. */
+        cuSet('pitch', els.cuPitch, data.pitchNow != null ? data.pitchNow.toFixed(2) : '—');
+        cuSet('dset', els.cuDetuneSet, (typeof data.detuneRaw === 'number') ? (fmtCents(data.detuneRaw * 100 / 64) + '（生値 ' + data.detuneRaw + '）') : '—');
+        cuSet('porta', els.cuPorta, (typeof data.portamentoRaw === 'number') ? String(data.portamentoRaw) : '—');
+        const pl = data.pitchLfo, vl = data.volLfo;
+        cuSet('lfop', els.cuLfoPitch, pl ? (pl.on
+          ? ('ON ／ 波形 ' + (LFO_WAVE_NAMES[pl.wave & 3] || String(pl.wave)) + ' ／ 周期 ' + pl.lenRaw + ' tick ／ 深さ（デルタ開始値） ' + pl.deltaStart + ' ／ 現在オフセット ' + fmtCents(pl.offsetNow * 100 / 64))
+          : 'OFF') : '—');
+        cuSet('lfov', els.cuLfoVol, vl ? (vl.on
+          ? ('ON ／ 波形 ' + (LFO_WAVE_NAMES[vl.wave & 3] || String(vl.wave)) + ' ／ 周期 ' + vl.length + ' tick ／ 深さ（デルタ開始値） ' + vl.deltaStart + ' ／ 現在の減衰 ' + vl.offsetNow)
+          : 'OFF') : '—');
+        cuSet('lfod', els.cuLfoDelay, '設定 ' + data.lfoDelay + ' tick ／ 残り ' + data.lfoDelayCnt + ' tick');
         cuDrawCuTraces();
       }
       /* ---- voice parameters (voice-detail report, as v24) ---- */
@@ -4444,7 +4521,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
       }
       window.addEventListener('resize', () => {
-        if (cuCh != null && els.cuPanel && !els.cuPanel.hidden) { cuDrawKeyboard(); if (cuData) cuDrawCuTraces(); else cuDrawCuMeters(); }
+        if (cuCh != null && els.cuPanel && !els.cuPanel.hidden) { cuClampPosition(); cuDrawKeyboard(); if (cuData) cuDrawCuTraces(); else cuDrawCuMeters(); }
       });
       window.__mdxCloseup = {
         getState: () => ({ open: !!(els.cuPanel && !els.cuPanel.hidden), ch: cuCh, suppressedKey: cuSuppressedKey, positioned: cuPositioned, draws: cuDraws, meterDraws: cuMeterDraws, playing: cuPlaying })
