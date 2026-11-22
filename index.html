@@ -254,6 +254,14 @@
       .randinfo .rt { font-weight: 700; word-break: break-all; margin: 0 0 2px; }
       .randinfo .rm { color: var(--ink-dim); font-size: 0.86rem; margin: 0; word-break: break-all; }
       #randStatus { font-size: 0.88rem; min-height: 1.4em; margin-top: 10px; }
+      /* Debug-only skip log: stays hidden unless the development flag produced
+       * an entry (the wrapper's hidden attribute is only ever lifted
+       * by logSkipError, which itself no-ops when not DEBUG_ON). */
+      #skipLogWrap { margin-top: 10px; }
+      #skipLogWrap[hidden] { display: none; }
+      .skiplog-head { font-size: 0.82rem; color: var(--ink-dim); font-weight: 600; margin: 0 0 4px; }
+      #skipLog { list-style: none; margin: 0; padding: 0; max-height: 12em; overflow-y: auto; font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; }
+      #skipLog li { padding: 3px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; word-break: break-all; line-height: 1.45; }
       .notes { font-size: 0.9rem; }
       .notes li { margin-bottom: 6px; }
       .expl p { font-size: 0.92rem; margin: 0 0 10px; }
@@ -806,6 +814,10 @@
           <p class="rm" id="randMeta"></p>
         </div>
         <div id="randStatus" role="status"></div>
+        <div id="skipLogWrap" hidden>
+          <p class="skiplog-head">スキップした曲（デバッグ表示）</p>
+          <ul id="skipLog"></ul>
+        </div>
         <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②読み込むと、フォルダ内（サブフォルダ含む）の MDX を相対パスの順に並べ、先頭から順に再生します。曲が終わると次の曲へ進み（ループ曲は1周したら次へ）、最後の曲が終わると停止します。参照 PDX があれば同じフォルダから自動で読み込みます。プレイヤーの「前の曲」／「次の曲」ボタンで前後の曲へ移動でき、その横の「n / N」とパスが一覧の中での位置です。Mac のデスクトップ前提です。</p>
       </section>
 
@@ -5375,6 +5387,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         random: $('btnRandom'), next: $('btnRandomNext'),
         info: $('randInfo'), rTitle: $('randTitle'), rMeta: $('randMeta'),
         rStatus: $('randStatus'),
+        skipLogWrap: $('skipLogWrap'), skipLog: $('skipLog'),
         seqUi: $('seqUi'), seqPrev: $('btnSeqPrev'), seqNext: $('btnSeqNext'),
         seqInfo: $('seqInfo'), seqPos: $('seqPos'), seqPath: $('seqPath')
       };
@@ -5406,6 +5419,33 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         return String(p).replace(/\\/g, '/').normalize('NFC').toLowerCase();
       }
       function setRandStatus(msg) { catEls.rStatus.textContent = msg || ''; }
+
+      /* Debug-only skip log. When a song is skipped because it
+       * could not be loaded (sequential auto-skip, or a debug
+       * random draw retrying through the same load path), one line
+       * per skipped song — path plus the failure kind and reason —
+       * is appended here. DEBUG_ON only: without the development flag this
+       * function returns before touching the DOM, so nothing is
+       * ever shown (the v58 「読み込めない N 曲を飛ばしました」
+       * status suffix remains the normal-mode indication). Only
+       * the newest SKIP_LOG_MAX entries are kept; older lines are
+       * dropped from the top so the log cannot grow without bound.
+       * `fail` is the failure object playFolderEntry returns:
+       * { ok:false, kind:'read'|'parse'|'lzx', message, path, name }. */
+      const SKIP_LOG_MAX = 50;
+      function logSkipError(fail) {
+        if (!DEBUG_ON || !fail || fail.ok) return;
+        const wrap = catEls.skipLogWrap, list = catEls.skipLog;
+        if (!wrap || !list) return;
+        wrap.hidden = false;
+        const kindLabel = fail.kind === 'lzx' ? 'LZX展開失敗'
+          : fail.kind === 'parse' ? '解析失敗' : '読み込み失敗';
+        const li = document.createElement('li');
+        li.textContent = (fail.path || fail.name || '(不明な曲)') + ' — ' + kindLabel
+          + (fail.message ? ': ' + fail.message : '');
+        list.appendChild(li);
+        while (list.children.length > SKIP_LOG_MAX) list.removeChild(list.firstChild);
+      }
 
       /* ---------------- catalog loading ---------------- */
       function acceptCatalog(data, originLabel) {
@@ -5960,7 +6000,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             seqCurrentKey = folderSongs[idx].key;
             seqBaseLoop = null;
             updateSeqUi(); updateAdvanceFlag();
-            if (await playFolderEntry(folderSongs[idx])) {
+            const res = await playFolderEntry(folderSongs[idx]);
+            if (res && res.ok) {
               if (seqStopRequested) {
                 /* Stop was pressed while this song was loading:
                  * honour it now that the load has committed —
@@ -5980,6 +6021,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
                 return true;
               }
               seqParked = false; /* a song starting (again) un-parks the mode */
+              updateAdvanceFlag(); /* the flag must be exact again the moment the park is released */
               /* Arm the state hook's hold-off window: reports
                * from the previous song may still be in flight
                * and must not advance this song again. The timer
@@ -6002,6 +6044,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
               if (fails > 0) setRandStatus(catEls.rStatus.textContent + '（読み込めない ' + fails + ' 曲を飛ばしました）');
               return true;
             }
+            logSkipError(res); /* debug only: one line per skipped song, with its failure reason */
             if (!seqActive) return false; /* cancelled while loading */
             fails++; idx += step;
           }
@@ -6116,36 +6159,48 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * name is read from the MDX header (via the engine's own
        * parser, after LZX expansion when needed) and resolved
        * inside the same index through findPdx(); no PDX found
-       * means FM-only playback, same as a manual load. Returns
-       * true when a song was started, false when the file cannot
-       * be read or the MDX cannot be parsed (an LZX expansion
-       * failure counts as the latter). */
+       * means FM-only playback, same as a manual load. Returns a
+       * result object: { ok:true } when a song was started, or
+       * { ok:false, kind, message, path, name } when it was not —
+       * kind distinguishes 'read' (the file could not be read),
+       * 'lzx' (LZX expansion failed) and 'parse' (parseMDX threw;
+       * message carries its exception text). Callers pass the
+       * failure object through their skip handling to the
+       * debug-only skip log (logSkipError). */
       async function playFolderEntry(pick) {
         catEls.info.hidden = false;
         setRandStatus('読み込み中…');
         let mdxBytes;
         try { mdxBytes = await readEntryBytes(pick.ent); }
-        catch (e) { setRandStatus('MDX の読み込みに失敗しました: ' + e.message); return false; }
+        catch (e) {
+          setRandStatus('MDX の読み込みに失敗しました: ' + e.message);
+          return { ok: false, kind: 'read', message: e.message, path: pick.path, name: pick.name };
+        }
+        let parseBytes = mdxBytes;
+        if (typeof isLzxBytes === 'function' && isLzxBytes(parseBytes)) {
+          try { parseBytes = maybeExpandLzx(parseBytes); }
+          catch (e) {
+            setRandStatus('LZX の展開に失敗しました: ' + e.message);
+            return { ok: false, kind: 'lzx', message: e.message, path: pick.path, name: pick.name };
+          }
+        }
         let title = '';
         let pdxRef = '';
         try {
-          let parseBytes = mdxBytes;
-          if (typeof isLzxBytes === 'function' && isLzxBytes(parseBytes)) parseBytes = maybeExpandLzx(parseBytes);
           const info = MDXEngine.parseMDX(parseBytes);
           title = info.title || '';
           pdxRef = (info.pdxName || '').replace(/\.pdx$/i, '');
         } catch (e) {
-          /* Unparseable (or LZX expansion failed): loadSong would
-           * fail the same way on the same bytes, so report the
-           * failure HERE instead of swallowing it and letting the
-           * caller count a song that never started as a success.
-           * The caller's skip machinery (skip in the direction of
-           * travel, stop after 10 failures in a row) then applies
-           * to unparseable songs exactly as to unreadable ones,
-           * and no half-updated display is left pointing at a song
-           * that is not playing. */
+          /* Unparseable: loadSong would fail the same way on the
+           * same bytes, so report the failure HERE instead of
+           * swallowing it and letting the caller count a song that
+           * never started as a success. The caller's skip machinery
+           * (skip in the direction of travel, stop after 10 failures
+           * in a row) then applies to unparseable songs exactly as
+           * to unreadable ones, and no half-updated display is left
+           * pointing at a song that is not playing. */
           setRandStatus('MDX の解析に失敗しました: ' + e.message);
-          return false;
+          return { ok: false, kind: 'parse', message: e.message, path: pick.path, name: pick.name };
         }
         catEls.rTitle.textContent = title || pick.name;
         catEls.rMeta.textContent = 'パス: ' + pick.path;
@@ -6167,7 +6222,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         } else {
           setRandStatus('再生中: ' + pick.name + modeNote);
         }
-        return true;
+        return { ok: true };
       }
       /* One folder pick attempt (debug random). Draws from the
        * folder MDX list; with 2+ candidates the previous pick is
@@ -6183,9 +6238,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
         const pick = pool[Math.floor(Math.random() * pool.length)];
         lastFolderPick = pick;
-        const ok = await playFolderEntry(pick);
-        if (ok) seqAdopt(pick);
-        return ok;
+        const res = await playFolderEntry(pick);
+        if (res && res.ok) seqAdopt(pick);
+        return res; /* the result object (incl. any failure reason) goes back to the caller's skip handling */
       }
       /* Dispatch: debug catalog mode (when a catalog is loaded)
        * keeps its original behaviour; everything else draws from
@@ -6202,7 +6257,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         contBusy = true;
         try {
           for (let i = 0; i < 10; i++) {
-            if (await pickRandomSong()) return;
+            const r = await pickRandomSong();
+            if (r === true || (r && r.ok)) return;
+            logSkipError(r); /* debug only: a failed draw is a skip here (catalog picks return plain booleans and log nothing) */
             if (!contMode) return; /* cancelled while picking */
           }
           setContMode(false);
