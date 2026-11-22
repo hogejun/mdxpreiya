@@ -144,6 +144,19 @@
       #playerPanel:not(.check-on) .now-meta,
       #playerPanel:not(.check-on) .warnline { display: none !important; }
       .transport { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: stretch; }
+      #seqUi { display: inline-flex; gap: 8px; align-items: center; }
+      #seqUi[hidden] { display: none; }
+      /* Sequential position / path row: a full-width line of its
+       * own between the title/meta and the progress bar (moved out
+       * of the transport row, where a long path overflowed the
+       * panel). Shown only while folder sequential mode is live.
+       * The "n / N" counter never wraps or splits; only the path
+       * wraps, anywhere, so long folder/file names can neither
+       * push the row sideways nor overflow the panel. */
+      #seqInfo { display: flex; gap: 8px; align-items: baseline; width: 100%; min-width: 0; margin-top: 8px; }
+      #seqInfo[hidden] { display: none; }
+      #seqPos { flex: 0 0 auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92rem; white-space: nowrap; }
+      #seqPath { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; color: var(--ink-dim); white-space: normal; overflow-wrap: anywhere; word-break: break-all; line-height: 1.4; }
       .tbtn {
         border: 1px solid var(--line); background: var(--btn); color: var(--btn-ink);
         border-radius: 8px; padding: 8px 18px; font-size: 1rem; cursor: pointer;
@@ -229,6 +242,10 @@
       .filebox p { color: var(--ink-dim); font-size: 0.85rem; margin: 10px 0 0; }
       #status { font-size: 0.88rem; min-height: 1.4em; margin-top: 10px; }
       .cat-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; align-items: stretch; }
+      /* The random buttons live in #randDebug.cat-actions, whose display:flex
+       * above would otherwise override the hidden attribute and keep the
+       * debug-only buttons visible without the development flag (same fix as #seqUi). */
+      #randDebug[hidden] { display: none; }
       .rootdrop { margin-top: 10px; }
       .rootdrop p { margin: 0; }
       .cat-status { font-size: 0.88rem; color: var(--ink-dim); margin: 8px 0 0; min-height: 1.4em; word-break: break-all; }
@@ -465,6 +482,9 @@
         .console .warnline { margin-top: 4px; padding: 4px 8px; font-size: 0.72rem; }
         .console .transport { margin-top: 6px; gap: 6px; }
         .console .prog { margin-top: 5px; height: 5px; }
+        .console #seqInfo { margin-top: 4px; }
+        .console #seqPos { font-size: 0.8rem; }
+        .console #seqPath { font-size: 0.72rem; line-height: 1.35; }
         .console .tbtn { min-height: 26px; padding: 3px 10px; font-size: 0.85rem; }
         .console .tbtn.primary { min-width: 100px; }
         .console .readout { margin-top: 6px; gap: 5px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -555,11 +575,19 @@
         <p class="now-title" id="nowTitle"><span class="now-title-inner" id="nowTitleInner">曲が選択されていません</span></p>
         <p class="now-meta" id="nowMeta">下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。</p>
         <div class="warnline" id="pdxWarn"></div>
+        <div id="seqInfo" hidden>
+          <span id="seqPos" aria-label="フォルダ内での再生位置"></span>
+          <span id="seqPath"></span>
+        </div>
         <div class="prog" id="progBar" role="img" aria-label="再生位置（曲の1周分）"><div class="prog-fill" id="progFill"></div><div class="prog-loop" id="progLoop"></div></div>
         <div class="transport">
           <button class="tbtn primary" id="btnPlay" type="button">▶ 再生</button>
           <button class="tbtn" id="btnStop" type="button">■ 停止</button>
           <button class="tbtn" id="btnLoop" type="button" aria-pressed="true">ループ ON</button>
+          <span id="seqUi" hidden>
+            <button class="tbtn" id="btnSeqPrev" type="button">前の曲</button>
+            <button class="tbtn" id="btnSeqNext" type="button">次の曲</button>
+          </span>
         </div>
         <div class="readout">
           <div class="stat"><div class="k">Passed Time</div><div class="v" id="stTime">0:00.0</div></div>
@@ -750,8 +778,8 @@
       </section>
 
       <!-- ===================== folder & random ===================== -->
-      <section class="panel" aria-label="フォルダとランダム再生">
-        <h2>ランダム再生（フォルダ方式）</h2>
+      <section class="panel" aria-label="フォルダと順次再生">
+        <h2>フォルダ再生（順次再生）</h2>
         <div id="catDebug" hidden>
           <p class="cat-status" id="catStatus" style="margin-top:0">カタログを読み込んでいます…</p>
           <div class="cat-actions">
@@ -768,8 +796,8 @@
         <div class="filebox rootdrop" id="rootDrop">
           <p>MDX フォルダはここへの<strong>ドラッグ＆ドロップ</strong>でも読み込めます。アプリ内ブラウザのファイル選択ではフォルダが選べないため、その場合は Finder からコレクションのフォルダをここに落としてください。メーカー別フォルダを1つずつ落として追加していくこともできます。</p>
         </div>
-        <p class="cat-status" id="rootStatus">フォルダ未選択（ランダム再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）</p>
-        <div class="cat-actions">
+        <p class="cat-status" id="rootStatus">フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）</p>
+        <div class="cat-actions" id="randDebug" hidden>
           <button class="tbtn primary" id="btnRandom" type="button" aria-pressed="false">ランダム再生</button>
           <button class="tbtn" id="btnRandomNext" type="button">次のランダム</button>
         </div>
@@ -778,7 +806,7 @@
           <p class="rm" id="randMeta"></p>
         </div>
         <div id="randStatus" role="status"></div>
-        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②「ランダム再生」で、読み込んだフォルダ内（サブフォルダ含む）の MDX から無作為に1曲を選び、参照 PDX があれば同じフォルダから自動で読み込んで再生します。「ランダム再生」は連続モードの切り替えで、ON の間は曲が終わるたびに次のランダム曲を引きます（候補が2曲以上あるときは、直前と同じ曲は連続で引きません）。「次のランダム」でもう1曲引けます。Mac のデスクトップ前提です。</p>
+        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②読み込むと、フォルダ内（サブフォルダ含む）の MDX を相対パスの順に並べ、先頭から順に再生します。曲が終わると次の曲へ進み（ループ曲は1周したら次へ）、最後の曲が終わると停止します。参照 PDX があれば同じフォルダから自動で読み込みます。プレイヤーの「前の曲」／「次の曲」ボタンで前後の曲へ移動でき、その横の「n / N」とパスが一覧の中での位置です。Mac のデスクトップ前提です。</p>
       </section>
 
       <!-- ===================== notes ===================== -->
@@ -5312,19 +5340,27 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       els.dropBox.addEventListener('drop', (e) => handleFiles(e.dataTransfer && e.dataTransfer.files));
     </script>
 
-    <!-- ================= folder & random playback =================
-         Standard mode is folder-based: the intake below indexes
-         whatever folder / files the user picks, random picks are
-         drawn from the .mdx files in that index (subfolders
-         included), and a pick's referenced PDX is resolved by name
-         inside the same index. The full-collection catalog mode
-         (catalog.json: maker / game / title / filename / relpath /
-         size / pdx_ref per song) is debug-only: it activates only
-         with the development configuration and is
-         otherwise not fetched, not shown and never drawn from.
-         Picks play through the existing loadSong() path. File
-         lookup keys are Unicode-normalized (NFC) and lower-cased
-         so NFD relpaths match real Mac files either way. -->
+    <!-- ================= folder playback (sequential / debug random) =================
+         Standard mode is folder-based sequential playback: the
+         intake below indexes whatever folder / files the user
+         picks, the .mdx files in that index (subfolders included)
+         are sorted into a natural per-segment path order, and they
+         play in that order from the head of the list, advancing on
+         song end (or after one loop for looped songs) through the
+         same state hook the continuous random mode uses. A song's
+         referenced PDX is resolved by name inside the same index.
+         Random picks are debug-only: the buttons are shown and
+         the draw is reachable only with the development flag (the v31
+         check-display parameter); while random mode is ON it
+         decides the next song, otherwise sequential playback
+         applies. The full-collection catalog mode (catalog.json:
+         maker / game / title / filename / relpath / size /
+         pdx_ref per song) is debug-only too: it activates only
+         with the development configuration and is otherwise not fetched, not shown and
+         never drawn from. Songs play through the existing
+         loadSong() path. File lookup keys are Unicode-normalized
+         (NFC) and lower-cased so NFD relpaths match real Mac
+         files either way. -->
     <script>
       'use strict';
       const catEls = {
@@ -5333,7 +5369,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         filesInput: $('rootFilesInput'), drop: $('rootDrop'),
         random: $('btnRandom'), next: $('btnRandomNext'),
         info: $('randInfo'), rTitle: $('randTitle'), rMeta: $('randMeta'),
-        rStatus: $('randStatus')
+        rStatus: $('randStatus'),
+        seqUi: $('seqUi'), seqPrev: $('btnSeqPrev'), seqNext: $('btnSeqNext'),
+        seqInfo: $('seqInfo'), seqPos: $('seqPos'), seqPath: $('seqPath')
       };
       let catalog = null;     /* parsed catalog.json (debug mode only) */
       let rootFiles = null;   /* Map: normalized relpath -> File | FileSystemFileHandle */
@@ -5341,9 +5379,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       /* Catalog mode is debug-only: the same URL parameter as the
        * v31 check display (the development configuration)
        * enables it. Without the parameter the catalog UI stays
-       * hidden, no catalog is fetched, and random picks come from
-       * the selected folder's MDX list instead — so the public
-       * build (no catalog data) still gets working random play. */
+       * hidden, no catalog is fetched, and the selected folder's
+       * MDX list plays sequentially instead — so the public build
+       * (no catalog data) still gets working folder playback. The
+       * random buttons are likewise shown only in debug mode, and
+       * the random draw is unreachable without the parameter. */
       const DEBUG_ON = (() => {
         try {
           const v = new URLSearchParams(location.search || '').get('debug');
@@ -5352,7 +5392,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           return lv === '1' || lv === 'true' || lv === 'on';
         } catch (e) { return false; }
       })();
-      if (DEBUG_ON) { const cd = $('catDebug'); if (cd) cd.hidden = false; }
+      if (DEBUG_ON) {
+        const cd = $('catDebug'); if (cd) cd.hidden = false;
+        const rd = $('randDebug'); if (rd) rd.hidden = false;
+      }
 
       function normKey(p) {
         return String(p).replace(/\\/g, '/').normalize('NFC').toLowerCase();
@@ -5446,14 +5489,68 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         return map;
       }
       /* ---------------- folder song list ----------------
-         The standard random-pick pool: every distinct .mdx file in
-         the index (extension check on the normalized key, so .MDX
-         counts too; subfolders included). The same file can sit
-         under several keys (full path + stripped variants), so
-         dedupe by the file object itself and keep the longest key
-         as its canonical path. Rebuilt whenever the index changes. */
+         Every distinct .mdx file in the index (extension check on
+         the normalized key, so .MDX counts too; subfolders
+         included). The same file can sit under several keys (full
+         path + stripped variants), so dedupe by the file object
+         itself and keep the longest key as its canonical path.
+         Rebuilt whenever the index changes, then sorted into the
+         sequential playback order: a natural sort compared path
+         segment by path segment (so songs stay grouped by folder),
+         with digit runs compared as numbers (BGM2 before BGM10)
+         and case ignored (the keys are already lower-cased). */
       let folderSongs = [];      /* [{key, path, name, ent}] */
       let lastFolderPick = null; /* previous folder pick (no-repeat) */
+      /* ---------------- sequential playback state ----------------
+         The current position is held by the song itself (its file
+         object identity, with its key as fallback), never by a
+         bare index alone: when folders are added later and the
+         list is rebuilt and re-sorted, the position is re-located
+         from the current song so playback continues where it was. */
+      let seqActive = false;     /* folder sequential mode ON/OFF */
+      let seqIndex = -1;         /* position of the current song in folderSongs */
+      let seqCurrentEnt = null;  /* file object of the current song */
+      let seqCurrentKey = '';    /* key of the current song (fallback) */
+      let seqBusy = false;       /* re-entry guard while a song load is in flight */
+      let seqBaseLoop = null;    /* loopCount when the current song started */
+      /* After a sequential load commits, state reports from the
+       * PREVIOUS song can still be in flight (above all its
+       * 'ended', posted when it ended while the new song was
+       * loading, or its last loop increment). Acting on one would
+       * advance the new song a second time — one 「前の曲」 press
+       * appearing to jump more than one song. Until a report that
+       * can only belong to the loaded song is seen (see the state
+       * hook), advance signals are held off. */
+      let seqAwaitConfirm = false; /* waiting for the loaded song's own report */
+      let seqLoadStamp = 0;        /* performance.now() when the load committed */
+      let seqSwallowedEnd = false; /* an 'ended' was held off during the wait */
+      let seqConfirmTimer = null;  /* safety release for the wait */
+      function naturalSegCompare(a, b) {
+        const ca = String(a).match(/\d+|\D+/g) || [];
+        const cb = String(b).match(/\d+|\D+/g) || [];
+        const n = Math.min(ca.length, cb.length);
+        for (let i = 0; i < n; i++) {
+          const x = ca[i], y = cb[i];
+          if (x === y) continue;
+          if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+            const nx = Number(x), ny = Number(y);
+            if (nx !== ny) return nx < ny ? -1 : 1;
+            if (x.length !== y.length) return x.length < y.length ? -1 : 1;
+            continue;
+          }
+          return x < y ? -1 : 1;
+        }
+        return ca.length === cb.length ? 0 : (ca.length < cb.length ? -1 : 1);
+      }
+      function naturalPathCompare(a, b) {
+        const pa = String(a).split('/'), pb = String(b).split('/');
+        const n = Math.min(pa.length, pb.length);
+        for (let i = 0; i < n; i++) {
+          const c = naturalSegCompare(pa[i], pb[i]);
+          if (c) return c;
+        }
+        return pa.length === pb.length ? 0 : (pa.length < pb.length ? -1 : 1);
+      }
       function rebuildFolderSongs() {
         folderSongs = [];
         if (!rootFiles) return;
@@ -5466,11 +5563,25 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           }
         }
         folderSongs = Array.from(byEnt.values());
+        folderSongs.sort((a, b) => naturalPathCompare(a.key, b.key));
+        /* Re-locate the sequential position from the current song
+         * itself (file identity first, key as fallback). */
+        if (seqActive) {
+          let i = seqCurrentEnt ? folderSongs.findIndex((s) => s.ent === seqCurrentEnt) : -1;
+          if (i < 0 && seqCurrentKey) i = folderSongs.findIndex((s) => s.key === seqCurrentKey);
+          if (i >= 0) seqIndex = i;
+        }
       }
       function mergeRootFiles(map, label) {
         if (!rootFiles) rootFiles = new Map();
         for (const [k, v] of map) rootFiles.set(k, v);
         reportRoot(label);
+        /* Folder intake starts sequential playback at the head of
+         * the list (autoplay). When songs are added while
+         * sequential mode is already running, the current song
+         * keeps playing; rebuildFolderSongs() has already
+         * re-located its position in the re-sorted list. */
+        if (!seqActive && !contMode && folderSongs.length) startSequential(0);
       }
       function reportRoot(name) {
         lastRootName = name;
@@ -5492,6 +5603,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           msg += ' ／ カタログの ' + hit.toLocaleString('ja-JP') + ' 曲と一致';
         }
         catEls.rootStatus.textContent = msg;
+        updateSeqUi();
       }
       $('btnRootPick').addEventListener('click', async () => {
         if (window.showDirectoryPicker) {
@@ -5626,17 +5738,24 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         return new Uint8Array(await f.arrayBuffer());
       }
 
-      /* ---------------- random playback ----------------
-         「ランダム再生」 is a toggle for continuous random mode.
-         While ON, a song end (state 'ended') automatically picks the
-         next random song; a looped song never ends, so it advances
-         once its loopCount passes the value captured when that song
-         started. 「次のランダム」 skips to the next pick while ON
-         and keeps its old one-shot behaviour while OFF. State
-         reports reach this script through window.__mdxStateHook,
-         which the main UI script calls at the end of showState();
-         the stop button and manual song loads cancel the mode
-         through window.__mdxRandomOff. */
+      /* ---------------- sequential & random playback ----------------
+         Sequential playback (the default) and continuous random
+         playback (debug only) share the same advance machinery:
+         a song end (state 'ended') moves to the next song, and a
+         looped song never ends, so it advances once its loopCount
+         passes the value captured when that song started. They
+         differ only in how the next song is chosen: sequential
+         takes the next element of the sorted folder list, random
+         draws one. While random mode is ON (reachable only with
+         the development configuration: its buttons stay hidden otherwise and its
+         handlers refuse to run) it decides the next song; when it
+         is OFF, sequential playback applies. 「次のランダム」 skips
+         to the next pick while ON and keeps its old one-shot
+         behaviour while OFF. State reports reach this script
+         through window.__mdxStateHook, which the main UI script
+         calls at the end of showState(); the stop button and
+         manual song loads outside the folder list cancel both
+         modes through window.__mdxRandomOff. */
       let contMode = false;      /* continuous random mode ON/OFF */
       let contBusy = false;      /* re-entry guard while a pick is in flight */
       let contBaseLoop = null;   /* loopCount when the current pick started */
@@ -5650,33 +5769,186 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (folderSongs.length) return true;
         return DEBUG_ON && !!catalog && !!rootFiles;
       }
+      /* True while either mode will advance to a next song at a
+       * natural end; read by the UI script's natural-end suspend
+       * decision (kept under the existing __mdxContModeOn name). */
+      function updateAdvanceFlag() {
+        window.__mdxContModeOn = contMode || (seqActive && seqIndex < folderSongs.length - 1);
+      }
       function setContMode(on) {
+        if (on && !DEBUG_ON) on = false; /* random is debug-only */
         contMode = on;
-        window.__mdxContModeOn = on; /* read by the UI script's natural-end suspend decision */
         catEls.random.setAttribute('aria-pressed', String(on));
         catEls.random.textContent = on ? 'ランダム再生（連続 ON）' : 'ランダム再生';
         if (!on) contBaseLoop = null;
+        updateAdvanceFlag();
       }
       window.__mdxRandomOff = function () {
-        if (!contMode) return;
+        const wasSeq = seqActive;
+        if (seqActive) stopSequential('');
+        if (!contMode) {
+          if (wasSeq) setRandStatus('フォルダ順次再生を終了しました。');
+          return;
+        }
         setContMode(false);
         setRandStatus('連続ランダム再生モードを OFF にしました。');
       };
       window.__mdxContModeOn = false;
-      /* Returns true when this report makes continuous mode advance
+      /* Returns true when this report makes either mode advance
        * to the next song, so the UI script can keep the audio
        * context running instead of suspending it at natural end. */
       window.__mdxStateHook = function (s) {
         if (!s) return false;
         const lc = s.loopCount || 0;
-        if (lc < hookLastLoop) contBaseLoop = lc; /* loopCount reset: a new song started */
+        const lcReset = lc < hookLastLoop;
+        if (lcReset) { contBaseLoop = lc; seqBaseLoop = lc; } /* loopCount reset: a new song started */
         hookLastLoop = lc;
-        if (!contMode || contBusy) return false;
-        if (s.ended) { advanceRandom(); return true; }
-        if (contBaseLoop === null) { if (s.playing) contBaseLoop = lc; return false; }
-        if (lc > contBaseLoop) { advanceRandom(); return true; }
+        if (contBusy || seqBusy) return false;
+        if (contMode) {
+          if (s.ended) { advanceRandom(); return true; }
+          if (contBaseLoop === null) { if (s.playing) contBaseLoop = lc; return false; }
+          if (lc > contBaseLoop) { advanceRandom(); return true; }
+          return false;
+        }
+        if (seqActive) {
+          if (seqAwaitConfirm) {
+            /* Hold-off window after a sequential load (see
+             * seqAwaitConfirm above): an 'ended' here is the
+             * previous song's late report, so swallow it —
+             * returning true keeps the UI from treating it as a
+             * natural end — and remember it in case it was in
+             * fact the loaded song's own instant end (decided by
+             * the release timer in playSeqAt). Any other report
+             * confirms the loaded song only if it cannot be the
+             * previous song still playing out: a loopCount reset,
+             * or an elapsed time no older than the time since the
+             * load committed (the previous song had already been
+             * playing longer than that when it was replaced,
+             * unless it was skipped within its first second, in
+             * which case it cannot have ended in the window). */
+            if (s.ended) { seqSwallowedEnd = true; return true; }
+            const fresh = lcReset || s.elapsed == null || s.elapsed <= (performance.now() - seqLoadStamp) / 1000 + 1;
+            if (!fresh) return false;
+            seqAwaitConfirm = false; seqSwallowedEnd = false;
+            if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
+            if (seqBaseLoop === null && s.playing) seqBaseLoop = lc;
+            return false;
+          }
+          if (s.ended) return advanceSequential();
+          if (seqBaseLoop === null) { if (s.playing) seqBaseLoop = lc; return false; }
+          if (lc > seqBaseLoop) return advanceSequential();
+        }
         return false;
       };
+
+      /* ---------------- sequential playback ----------------
+         Folder sequential mode is the default behaviour whenever
+         a folder list exists: no on/off switch, it starts at the
+         head of the list when a folder is loaded and stops after
+         the last song (no wrap-around). The player panel shows
+         「前の曲」/「次の曲」 and "n / N" plus the current path
+         only while the mode is live. */
+      function updateSeqUi() {
+        if (!catEls.seqUi) return;
+        const on = seqActive && folderSongs.length > 0 && seqIndex >= 0;
+        catEls.seqUi.hidden = !on;
+        if (catEls.seqInfo) catEls.seqInfo.hidden = !on;
+        if (on) {
+          catEls.seqPos.textContent = (seqIndex + 1) + ' / ' + folderSongs.length;
+          const cur = folderSongs[seqIndex];
+          catEls.seqPath.textContent = cur ? cur.path : '';
+          catEls.seqPath.title = cur ? cur.path : '';
+        }
+      }
+      function stopSequential(msg) {
+        seqActive = false; seqIndex = -1;
+        seqCurrentEnt = null; seqCurrentKey = ''; seqBaseLoop = null;
+        seqAwaitConfirm = false; seqSwallowedEnd = false;
+        if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
+        updateSeqUi(); updateAdvanceFlag();
+        if (msg) setRandStatus(msg);
+      }
+      /* Load the list element at idx and start it. Songs that
+       * cannot be read are skipped in the direction of travel
+       * (dir -1 for 「前の曲」, +1 otherwise): skipping forward
+       * unconditionally walked the position AWAY from a 「前の曲」
+       * target — past the current song and beyond — whenever the
+       * target could not be read. 10 failures in a row (the
+       * continuous-random attempt limit, reused) or running off
+       * the end of the list in the direction of travel stops the
+       * mode. */
+      async function playSeqAt(idx, dir) {
+        if (seqBusy || !seqActive) return false;
+        const step = dir < 0 ? -1 : 1;
+        seqBusy = true;
+        try {
+          let fails = 0;
+          while (idx >= 0 && idx < folderSongs.length && fails < 10) {
+            seqIndex = idx;
+            seqCurrentEnt = folderSongs[idx].ent;
+            seqCurrentKey = folderSongs[idx].key;
+            seqBaseLoop = null;
+            updateSeqUi(); updateAdvanceFlag();
+            if (await playFolderEntry(folderSongs[idx])) {
+              /* Arm the state hook's hold-off window: reports
+               * from the previous song may still be in flight
+               * and must not advance this song again. The timer
+               * releases the wait if no confirming report ever
+               * arrives (e.g. the audio context is suspended);
+               * if an 'ended' was swallowed meanwhile and nothing
+               * else was heard, the loaded song must have ended
+               * before its first playing report (shorter than
+               * one report interval), so advance from it then. */
+              seqAwaitConfirm = true; seqSwallowedEnd = false;
+              seqLoadStamp = performance.now();
+              if (seqConfirmTimer != null) clearTimeout(seqConfirmTimer);
+              seqConfirmTimer = setTimeout(() => {
+                seqConfirmTimer = null;
+                if (!seqAwaitConfirm) return;
+                seqAwaitConfirm = false;
+                if (seqSwallowedEnd && seqActive) { seqSwallowedEnd = false; advanceSequential(); }
+                seqSwallowedEnd = false;
+              }, 2500);
+              return true;
+            }
+            if (!seqActive) return false; /* cancelled while loading */
+            fails++; idx += step;
+          }
+          if (fails >= 10) stopSequential('読み込めない曲が続いたため、フォルダ順次再生を終了しました。');
+          else if (step < 0) stopSequential('読み込める曲が前にないため、フォルダ順次再生を終了しました。');
+          else stopSequential('フォルダ内の曲をすべて再生しました。');
+          return false;
+        } finally { seqBusy = false; }
+      }
+      function startSequential(idx) {
+        seqActive = true;
+        seqIndex = -1; seqCurrentEnt = null; seqCurrentKey = ''; seqBaseLoop = null;
+        updateSeqUi(); updateAdvanceFlag();
+        playSeqAt(idx);
+      }
+      /* Natural-end / loop advance for sequential mode. Returns
+       * true when a next song is being started (the state hook
+       * then keeps the audio context running); at the last song
+       * the mode ends and the song simply stops. */
+      function advanceSequential() {
+        if (!seqActive) return false;
+        if (seqIndex >= folderSongs.length - 1) {
+          stopSequential('フォルダ内の最後の曲が終わりました。');
+          return false;
+        }
+        playSeqAt(seqIndex + 1);
+        return true;
+      }
+      /* Adopt a folder song loaded through another route (a debug
+       * random pick) as the sequential position, without leaving
+       * sequential mode: playback continues after that song. */
+      function seqAdopt(entry) {
+        if (!seqActive || !entry) return;
+        const i = folderSongs.indexOf(entry);
+        if (i < 0) return;
+        seqIndex = i; seqCurrentEnt = entry.ent; seqCurrentKey = entry.key; seqBaseLoop = null;
+        updateSeqUi(); updateAdvanceFlag();
+      }
 
       /* One catalog pick attempt (debug mode). Returns true when
        * a song was started. */
@@ -5701,9 +5973,13 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             } catch (e) { /* PDX が読めなければ FM のみで続行 */ }
           }
         }
-        contBaseLoop = null; /* the state hook re-captures it for this song */
+        contBaseLoop = null; seqBaseLoop = null; /* the state hook re-captures them for this song */
         await loadSong(mdxBytes, entry.relpath, 'catalog', true, pdxOverride);
-        const modeNote = contMode ? '（連続ランダム再生中）' : '';
+        if (seqActive) {
+          const k = normKey(entry.relpath);
+          seqAdopt(folderSongs.find((s) => s.key === k || s.key.endsWith('/' + k)) || null);
+        }
+        const modeNote = contMode ? '（連続ランダム再生中）' : (seqActive ? '（フォルダ順次再生中）' : '');
         if (entry.pdx_ref && !pdxOverride) {
           setRandStatus('再生中: ' + entry.filename + '（参照 PDX「' + entry.pdx_ref + '」がフォルダ内に見つからず、FM のみ再生）' + modeNote);
         } else {
@@ -5711,23 +5987,14 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
         return true;
       }
-      /* One folder pick attempt (standard mode). Draws from the
-       * folder MDX list; with 2+ candidates the previous pick is
-       * excluded so the same song never comes up twice in a row.
-       * The referenced PDX name is read from the MDX header (via
-       * the engine's own parser, after LZX expansion when needed)
-       * and resolved inside the same index through findPdx(); no
-       * PDX found means FM-only playback, same as a manual load.
-       * Returns true when a song was started. */
-      async function pickFolderSong() {
-        if (!folderSongs.length) return false;
-        let pool = folderSongs;
-        if (pool.length >= 2 && lastFolderPick) {
-          const rest = pool.filter((s) => s !== lastFolderPick);
-          if (rest.length) pool = rest;
-        }
-        const pick = pool[Math.floor(Math.random() * pool.length)];
-        lastFolderPick = pick;
+      /* Load and start one folder-list song (shared by sequential
+       * playback and by folder random picks). The referenced PDX
+       * name is read from the MDX header (via the engine's own
+       * parser, after LZX expansion when needed) and resolved
+       * inside the same index through findPdx(); no PDX found
+       * means FM-only playback, same as a manual load. Returns
+       * true when a song was started. */
+      async function playFolderEntry(pick) {
         catEls.info.hidden = false;
         setRandStatus('読み込み中…');
         let mdxBytes;
@@ -5754,15 +6021,33 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             } catch (e) { /* PDX が読めなければ FM のみで続行 */ }
           }
         }
-        contBaseLoop = null; /* the state hook re-captures it for this song */
+        contBaseLoop = null; seqBaseLoop = null; /* the state hook re-captures them for this song */
         await loadSong(mdxBytes, pick.path, 'folder', true, pdxOverride);
-        const modeNote = contMode ? '（連続ランダム再生中）' : '';
+        const modeNote = contMode ? '（連続ランダム再生中）' : (seqActive ? '（フォルダ順次再生中）' : '');
         if (pdxRef && !pdxOverride) {
           setRandStatus('再生中: ' + pick.name + '（参照 PDX「' + pdxRef + '」がフォルダ内に見つからず、FM のみ再生）' + modeNote);
         } else {
           setRandStatus('再生中: ' + pick.name + modeNote);
         }
         return true;
+      }
+      /* One folder pick attempt (debug random). Draws from the
+       * folder MDX list; with 2+ candidates the previous pick is
+       * excluded so the same song never comes up twice in a row.
+       * When sequential mode is live, the pick becomes the
+       * sequential position (the mode is not cancelled). */
+      async function pickFolderSong() {
+        if (!folderSongs.length) return false;
+        let pool = folderSongs;
+        if (pool.length >= 2 && lastFolderPick) {
+          const rest = pool.filter((s) => s !== lastFolderPick);
+          if (rest.length) pool = rest;
+        }
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        lastFolderPick = pick;
+        const ok = await playFolderEntry(pick);
+        if (ok) seqAdopt(pick);
+        return ok;
       }
       /* Dispatch: debug catalog mode (when a catalog is loaded)
        * keeps its original behaviour; everything else draws from
@@ -5793,6 +6078,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       const NO_SONGS_GUIDE = 'ランダム再生には、まず「MDX フォルダを選ぶ」「ファイルをまとめて選ぶ」か、フォルダのドラッグ＆ドロップで MDX ファイルを読み込んでください。';
       catEls.random.addEventListener('click', async () => {
+        if (!DEBUG_ON) return; /* random UI is debug-only */
         if (contMode) {
           setContMode(false);
           setRandStatus('連続ランダム再生モードを OFF にしました（再生中の曲はそのまま再生します）。');
@@ -5804,9 +6090,29 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         await advanceRandom();
       });
       catEls.next.addEventListener('click', () => {
+        if (!DEBUG_ON) return; /* random UI is debug-only */
         if (contMode) { advanceRandom(); return; }
         if (!randomAvailable()) { setRandStatus(NO_SONGS_GUIDE); return; }
         playRandomOnce();
+      });
+      /* Sequential skip buttons (player panel). 「前の曲」 always
+       * moves to the previous song (it never restarts the current
+       * one); at the head of the list it does nothing. 「次の曲」
+       * on the last song stops playback, which also ends
+       * sequential mode through the stop button's __mdxRandomOff. */
+      catEls.seqNext.addEventListener('click', () => {
+        if (!seqActive || seqBusy) return;
+        if (seqIndex >= folderSongs.length - 1) {
+          const sb = $('btnStop');
+          if (sb) sb.click();
+          return;
+        }
+        playSeqAt(seqIndex + 1);
+      });
+      catEls.seqPrev.addEventListener('click', () => {
+        if (!seqActive || seqBusy) return;
+        if (seqIndex <= 0) return;
+        playSeqAt(seqIndex - 1, -1);
       });
 
       if (DEBUG_ON) tryFetchCatalog();
