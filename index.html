@@ -5253,10 +5253,15 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const be = await ensureAudio(); if (!be) return;
         sendMuteSolo();
         if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus('一時停止中'); armSuspendPending(); }
-        else { cancelSuspendPending(); sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + cur.name); }
+        else { cancelSuspendPending(); sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + cur.name); if (window.__mdxSeqResume) window.__mdxSeqResume(); }
       });
       els.stop.addEventListener('click', async () => {
-        if (window.__mdxRandomOff) window.__mdxRandomOff();
+        /* Folder sequential mode is only parked by stop (position
+         * kept, resumable); random mode turns OFF as before. A
+         * load from outside the folder list is what ends
+         * sequential mode (loadSong's __mdxRandomOff). */
+        if (window.__mdxStopModes) window.__mdxStopModes();
+        else if (window.__mdxRandomOff) window.__mdxRandomOff();
         closeVoicePanel();
         closeAnalysisPanel();
         const be = await ensureAudio(); if (!be) return;
@@ -5508,6 +5513,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          list is rebuilt and re-sorted, the position is re-located
          from the current song so playback continues where it was. */
       let seqActive = false;     /* folder sequential mode ON/OFF */
+      let seqParked = false;     /* parked by the stop button: mode and
+       * position are kept (the list UI stays visible) and playback
+       * resumes from the parked song via the play button, or moves
+       * with the prev/next buttons. Only a load from outside the
+       * list ends the mode for real. */
       let seqIndex = -1;         /* position of the current song in folderSongs */
       let seqCurrentEnt = null;  /* file object of the current song */
       let seqCurrentKey = '';    /* key of the current song (fallback) */
@@ -5753,9 +5763,12 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          to the next pick while ON and keeps its old one-shot
          behaviour while OFF. State reports reach this script
          through window.__mdxStateHook, which the main UI script
-         calls at the end of showState(); the stop button and
-         manual song loads outside the folder list cancel both
-         modes through window.__mdxRandomOff. */
+         calls at the end of showState(); manual song loads outside
+         the folder list cancel both modes through
+         window.__mdxRandomOff, while the stop button goes through
+         window.__mdxStopModes: random mode turns OFF as before,
+         but sequential mode is only parked (position kept) so it
+         can resume — see seqParked above. */
       let contMode = false;      /* continuous random mode ON/OFF */
       let contBusy = false;      /* re-entry guard while a pick is in flight */
       let contBaseLoop = null;   /* loopCount when the current pick started */
@@ -5793,6 +5806,35 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         setContMode(false);
         setRandStatus('連続ランダム再生モードを OFF にしました。');
       };
+      /* Stop button. Random mode keeps its old behaviour (mode
+       * OFF, via __mdxRandomOff). Sequential mode is only PARKED:
+       * the list and the current position are kept, the prev/next
+       * buttons and the position display stay visible, and
+       * playback resumes from the parked song with the play
+       * button or moves with prev/next. The mode ends for real
+       * only when a song outside the list is loaded (the
+       * __mdxRandomOff path in loadSong). */
+      window.__mdxStopModes = function () {
+        if (contMode) { window.__mdxRandomOff(); return; }
+        if (!seqActive) return;
+        seqParked = true;
+        seqBaseLoop = null; /* re-captured by the state hook on resume */
+        seqAwaitConfirm = false; seqSwallowedEnd = false;
+        if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
+        updateSeqUi(); updateAdvanceFlag();
+        setRandStatus('フォルダ順次再生を停止しました（位置は保持しています）。');
+      };
+      /* Play button: when sequential mode is parked, pressing
+       * play restarts the parked song from the top (the engine
+       * still holds it; stop only reset its playback position)
+       * and sequential playback resumes from that position. */
+      window.__mdxSeqResume = function () {
+        if (!seqActive || !seqParked || contMode) return;
+        seqParked = false;
+        seqBaseLoop = null; /* re-captured by the state hook */
+        updateSeqUi(); updateAdvanceFlag();
+        setRandStatus('フォルダ順次再生を再開しました。');
+      };
       window.__mdxContModeOn = false;
       /* Returns true when this report makes either mode advance
        * to the next song, so the UI script can keep the audio
@@ -5811,6 +5853,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           return false;
         }
         if (seqActive) {
+          if (seqParked) return false; /* parked by the stop button: no advance until resumed */
           if (seqAwaitConfirm) {
             /* Hold-off window after a sequential load (see
              * seqAwaitConfirm above): an 'ended' here is the
@@ -5861,7 +5904,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
       }
       function stopSequential(msg) {
-        seqActive = false; seqIndex = -1;
+        seqActive = false; seqParked = false; seqIndex = -1;
         seqCurrentEnt = null; seqCurrentKey = ''; seqBaseLoop = null;
         seqAwaitConfirm = false; seqSwallowedEnd = false;
         if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
@@ -5890,6 +5933,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             seqBaseLoop = null;
             updateSeqUi(); updateAdvanceFlag();
             if (await playFolderEntry(folderSongs[idx])) {
+              seqParked = false; /* a song starting (again) un-parks the mode */
               /* Arm the state hook's hold-off window: reports
                * from the previous song may still be in flight
                * and must not advance this song again. The timer
@@ -5921,19 +5965,27 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         } finally { seqBusy = false; }
       }
       function startSequential(idx) {
-        seqActive = true;
+        seqActive = true; seqParked = false;
         seqIndex = -1; seqCurrentEnt = null; seqCurrentKey = ''; seqBaseLoop = null;
         updateSeqUi(); updateAdvanceFlag();
         playSeqAt(idx);
       }
       /* Natural-end / loop advance for sequential mode. Returns
        * true when a next song is being started (the state hook
-       * then keeps the audio context running); at the last song
-       * the mode ends and the song simply stops. */
+       * then keeps the audio context running). At the last song
+       * there is no next song to load, so playback itself is
+       * stopped — a looped last song would otherwise keep playing
+       * after its one loop, unlike mid-list songs, which the next
+       * load replaces — and the mode PARKS at the last position
+       * (the same parked state as the stop button): the position
+       * is kept, play replays the last song, prev goes back, and
+       * next does nothing. */
       function advanceSequential() {
         if (!seqActive) return false;
         if (seqIndex >= folderSongs.length - 1) {
-          stopSequential('フォルダ内の最後の曲が終わりました。');
+          const sb = $('btnStop');
+          if (sb) sb.click(); /* stops the engine and parks via __mdxStopModes */
+          setRandStatus('フォルダ内の最後の曲が終わりました。');
           return false;
         }
         playSeqAt(seqIndex + 1);
@@ -5946,6 +5998,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (!seqActive || !entry) return;
         const i = folderSongs.indexOf(entry);
         if (i < 0) return;
+        seqParked = false; /* a song starting (again) un-parks the mode */
         seqIndex = i; seqCurrentEnt = entry.ent; seqCurrentKey = entry.key; seqBaseLoop = null;
         updateSeqUi(); updateAdvanceFlag();
       }
@@ -5993,7 +6046,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * parser, after LZX expansion when needed) and resolved
        * inside the same index through findPdx(); no PDX found
        * means FM-only playback, same as a manual load. Returns
-       * true when a song was started. */
+       * true when a song was started, false when the file cannot
+       * be read or the MDX cannot be parsed (an LZX expansion
+       * failure counts as the latter). */
       async function playFolderEntry(pick) {
         catEls.info.hidden = false;
         setRandStatus('読み込み中…');
@@ -6008,7 +6063,19 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           const info = MDXEngine.parseMDX(parseBytes);
           title = info.title || '';
           pdxRef = (info.pdxName || '').replace(/\.pdx$/i, '');
-        } catch (e) { /* unparseable here: loadSong reports it below */ }
+        } catch (e) {
+          /* Unparseable (or LZX expansion failed): loadSong would
+           * fail the same way on the same bytes, so report the
+           * failure HERE instead of swallowing it and letting the
+           * caller count a song that never started as a success.
+           * The caller's skip machinery (skip in the direction of
+           * travel, stop after 10 failures in a row) then applies
+           * to unparseable songs exactly as to unreadable ones,
+           * and no half-updated display is left pointing at a song
+           * that is not playing. */
+          setRandStatus('MDX の解析に失敗しました: ' + e.message);
+          return false;
+        }
         catEls.rTitle.textContent = title || pick.name;
         catEls.rMeta.textContent = 'パス: ' + pick.path;
         let pdxOverride = null;
@@ -6098,11 +6165,14 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       /* Sequential skip buttons (player panel). 「前の曲」 always
        * moves to the previous song (it never restarts the current
        * one); at the head of the list it does nothing. 「次の曲」
-       * on the last song stops playback, which also ends
-       * sequential mode through the stop button's __mdxRandomOff. */
+       * on the last song stops playback and parks there (through
+       * the stop button's __mdxStopModes); while parked at the
+       * last song it does nothing. From the parked state both
+       * buttons load their song and resume sequential playback. */
       catEls.seqNext.addEventListener('click', () => {
         if (!seqActive || seqBusy) return;
         if (seqIndex >= folderSongs.length - 1) {
+          if (seqParked) return; /* parked at the last song: nothing to do */
           const sb = $('btnStop');
           if (sb) sb.click();
           return;
