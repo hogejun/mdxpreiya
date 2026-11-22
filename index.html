@@ -163,6 +163,7 @@
       .volrow { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
       .volrow label { font-size: 0.86rem; color: var(--ink-dim); white-space: nowrap; }
       .volrow input[type="range"] { flex: 1; min-height: 2.25rem; }
+      .tempoval { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92rem; min-width: 3.4em; text-align: right; }
       .spec-note { font-size: 0.8rem; color: var(--ink-dim); }
       .specwrap { background: var(--spec-bg); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
       #specCanvas { display: block; width: 100%; height: 120px; }
@@ -531,6 +532,12 @@
         <div class="volrow">
           <label for="vol">全体音量</label>
           <input type="range" id="vol" min="0" max="100" value="90" />
+        </div>
+        <div class="volrow">
+          <label for="tempoRate">テンポ</label>
+          <input type="range" id="tempoRate" min="50" max="200" step="1" value="100" />
+          <span class="tempoval" id="tempoVal">100%</span>
+          <button class="tbtn" id="btnTempoReset" type="button">100%に戻す</button>
         </div>
         <div id="status" role="status"></div>
       </section>
@@ -1538,6 +1545,12 @@ function MdxPlayer(sampleRate) {
   this.playing = false; this.ended = false;
   this.loopEnabled = true; this.loopCount = 0;
   this.userVolume = 0.9;
+  /* v53: user tempo multiplier (0.5–2.0, set via setTempoRate).
+   * A user setting like userVolume: load() / resetPlayback() must
+   * NOT reset it. The silent pass-measurement players are separate
+   * instances that never receive a rate, so they always run at 1.0
+   * and passInfo stays a pure tick count. */
+  this.tempoRate = 1.0;
   this.passInfo = null; /* v36: one-pass length / loop start, measured silently at load (report-only; see mdxMeasurePass) */
   this.chMute = []; this.chSolo = []; this._anySolo = false; /* per-channel mute/solo, set via setMuteSolo; all-false keeps the pre-mute/solo rendering path bit-identical */
   this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeSpeed = 0; this.fadeCounter = 0;
@@ -1734,7 +1747,25 @@ MdxPlayer.prototype.setMuteSolo = function (mute, solo) {
     else { t.keyOnPending = false; if (t.keyOn) { this.ym.write(0x08, t.idx); t.keyOn = false; } }
   }
 };
-MdxPlayer.prototype.tickSeconds = function () { return 256 * (256 - this.tempo) / 1000000; };
+/* ------------------------------------------------------------ tempo rate ---
+ * v53: playback-speed multiplier on top of the song's own tempo.
+ * The song data keeps owning the tempo value (FF / timer-B writes
+ * included); the rate only scales the tick's real duration, so
+ * in-song tempo changes scale proportionally and FM / PCM pitch
+ * is untouched — only the sequencer's advance changes, and every
+ * tick-based process (fade, key-on delay, LFO) follows naturally.
+ * tickSeconds() is the single conversion point: render() derives
+ * the samples per tick from it and tick() accumulates elapsed
+ * time from it, so a mid-playback change applies from the next
+ * tick on and never rewrites already-accumulated time. At a rate
+ * of exactly 1.0 the division is an IEEE identity, so rendering
+ * stays bit-identical to the pre-rate engine. */
+MdxPlayer.prototype.setTempoRate = function (rate) {
+  var r = Number(rate);
+  if (!isFinite(r)) return;
+  this.tempoRate = Math.min(2, Math.max(0.5, r));
+};
+MdxPlayer.prototype.tickSeconds = function () { return 256 * (256 - this.tempo) / 1000000 / this.tempoRate; };
 
 /* ------------------------------------------------------------ voice/TL --- */
 MdxPlayer.prototype.applyVoice = function (t) {
@@ -2839,6 +2870,7 @@ class MdxWorkletProcessor extends AudioWorkletProcessor {
         else if (m.type === 'pause') { this.player.playing = false; }
         else if (m.type === 'stop') { this.player.playing = false; this.player.resetPlayback(); }
         else if (m.type === 'volume') { this.player.userVolume = m.value; }
+        else if (m.type === 'tempo') { this.player.setTempoRate(m.value); }
         else if (m.type === 'loop') { this.player.loopEnabled = !!m.value; }
         else if (m.type === 'mutesolo') { this.player.setMuteSolo(m.mute, m.solo); }
         else if (m.type === 'voicedetail') { this.port.postMessage({ type: 'voicedetail', ch: m.ch, detail: this.player.getVoiceDetail(m.ch) }); }
@@ -2935,7 +2967,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         playerPanel: $('playerPanel'),
         time: $('stTime'), tempo: $('stTempo'), tickMs: $('stTickMs'), loopCount: $('stLoop'),
         progFill: $('progFill'), progLoop: $('progLoop'),
-        vol: $('vol'), status: $('status'), chList: $('chList'),
+        vol: $('vol'), tempoRate: $('tempoRate'), tempoVal: $('tempoVal'), tempoReset: $('btnTempoReset'),
+        status: $('status'), chList: $('chList'),
         songList: $('songList'), songList2: $('songList2'), fileInput: $('fileInput'), dropBox: $('dropBox'),
         spec: $('specCanvas'),
         voicePanel: $('voicePanel'), voiceTitle: $('voicePanelTitle'), voiceMeta: $('voicePanelMeta'),
@@ -4375,6 +4408,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (backend === 'worklet') {
           const msg = { type };
           if (type === 'volume') msg.value = value;
+          if (type === 'tempo') msg.value = value;
           if (type === 'loop') msg.value = value;
           workletNode.port.postMessage(msg);
         } else if (backend === 'script' && localPlayer) {
@@ -4382,6 +4416,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           else if (type === 'pause') localPlayer.playing = false;
           else if (type === 'stop') { localPlayer.playing = false; localPlayer.resetPlayback(); }
           else if (type === 'volume') localPlayer.userVolume = value;
+          else if (type === 'tempo') localPlayer.setTempoRate(value);
           else if (type === 'loop') localPlayer.loopEnabled = !!value;
         }
       }
@@ -4515,6 +4550,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         sendLoad(cur.mdx, cur.pdxBytes);
         sendMuteSolo();
         sendCmd('volume', els.vol.value / 100);
+        sendCmd('tempo', els.tempoRate.value / 100);
         sendCmd('loop', loopOn);
         if (autoplay) { sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + name); }
         else setStatus('読み込みました: ' + name);
@@ -4572,6 +4608,16 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         sendCmd('loop', loopOn);
       });
       els.vol.addEventListener('input', () => sendCmd('volume', els.vol.value / 100));
+      els.tempoRate.addEventListener('input', () => {
+        const pct = Number(els.tempoRate.value);
+        els.tempoVal.textContent = pct + '%';
+        sendCmd('tempo', pct / 100);
+      });
+      els.tempoReset.addEventListener('click', () => {
+        els.tempoRate.value = '100';
+        els.tempoVal.textContent = '100%';
+        sendCmd('tempo', 1);
+      });
       /* Check display (debug): enabled only by URL parameter.
        * At load, when the development flag is set
        * adds .check-on to the common parent (player panel); anything
