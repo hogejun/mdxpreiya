@@ -5047,7 +5047,20 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             const m = e.data;
             if (m.type === 'state') showState(m);
             else if (m.type === 'error') setStatus('再生エラー: ' + m.message);
-            else if (m.type === 'loaded' && m.nTracks) buildChannels(m.nTracks);
+            else if (m.type === 'loaded' && m.nTracks) {
+              /* Post-unload guard, same rule as showState's (v64):
+               * 'loaded' is a load acknowledgement, not a state
+               * report, so it carries no tick and slipped past the
+               * v63 guard — a 16-track song whose load landed just
+               * before 「選択をクリア」 unloaded it had its reply
+               * arrive after the unload and rebuild the rows the
+               * unload had just reset to 9. While no song is loaded
+               * (guard armed), drop the reply: no song-dependent
+               * display rebuild at all. A real load releases the
+               * guard in loadSong before its own reply can arrive,
+               * so the normal path is unchanged. */
+              if (!(staleReportGuard && !cur.mdx)) buildChannels(m.nTracks);
+            }
             else if (m.type === 'voicedetail') { renderVoiceDetail(m.detail); cuRenderVoiceDetail(m.detail); }
             else if (m.type === 'analysis') { renderAnalysis(m.data); cuRenderAnalysis(m.data); }
             else if (m.type === 'wasm-ready') { if (fmResolve) fmResolve('ready'); }
@@ -5337,6 +5350,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          * cuHide() alone left both behind. */
         refreshMuteSoloDisplay();
         describeSong(); /* title / meta / PDX warning back to the no-song text */
+        setStatus(''); /* main status line back to its launch-time (empty) state: without this it kept showing 「再生中: …」/「一時停止中」 after a clear */
         resetProgress();
         document.querySelectorAll('.song.playing').forEach((el) => el.classList.remove('playing'));
         reflectPlay(false);
