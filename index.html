@@ -1690,6 +1690,8 @@ function MdxPlayer(sampleRate) {
    * and passInfo stays a pure tick count. */
   this.tempoRate = 1.0;
   this.passInfo = null; /* v36: one-pass length / loop start, measured silently at load (report-only; see mdxMeasurePass) */
+  this.lapCount = 0; /* v66: song-level loop count on the MXDRV rule — one per lap in which every track still playing has looped (see _lapJump); this is what getState reports as loopCount. this.loopCount stays the raw loop-jump total that mdxMeasurePass phase B depends on. */
+  this._lapHit = []; /* v66: per-track "looped in the current lap" marks for _lapJump, rebuilt by resetPlayback */
   this.chMute = []; this.chSolo = []; this._anySolo = false; /* per-channel mute/solo, set via setMuteSolo; all-false keeps the pre-mute/solo rendering path bit-identical */
   this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeSpeed = 0; this.fadeCounter = 0;
   this.pcmPan = 3;
@@ -1745,14 +1747,16 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.noteCounts = [];
   this.trace = [];
   this.pcmUsage = {};
+  this._lapHit = [];
   for (var i = 0; i < this.song.nTracks; i++) {
     var isPCM = i >= 8;
     this.tracks.push(new MdxTrack(i, this.song.base + this.song.trackOffsets[i], isPCM));
     this.noteCounts.push(0);
+    this._lapHit.push(false);
   }
   this.tempo = 200;
   this.tickCount = 0; this.elapsed = 0;
-  this.ended = false; this.loopCount = 0;
+  this.ended = false; this.loopCount = 0; this.lapCount = 0;
   this.fadeAtten = 0; this.fadeActive = false; this.fadeArmed = false; this.fadeCounter = 0;
   this.pcmPan = 3;
   /* PCM8 mode starts OFF on every load / restart: MXDRV enters it
@@ -1767,6 +1771,39 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.errors = [];
   this.samplesToNextTick = 0;
   this.started = false;
+};
+/* ----------------------------------------------------- lap counting ---
+ * v66: the song-level loop count. MXDRV itself has no such counter
+ * (its channels loop independently); the rule adopted here stays
+ * closest to that behaviour: lapCount advances by one when every
+ * track still playing has looped at least once since the last
+ * advance. Called from the F1 loop jump (loop-enabled path only)
+ * with the track that just jumped. The judgment runs only at a
+ * jump — a track ending never counts at that moment — and a track
+ * that has ended (dead / counter < 0) leaves the set, so a song
+ * whose only looping track is short still advances once the other
+ * tracks are done. Tracks from the 10th on (index >= 9, the extra
+ * PCM channels) join the set only while PCM8 mode is on, judged by
+ * the runtime flag the E8 command sets (see pcm8Mode): in MXDRV
+ * those channels do not exist until then. When the count advances,
+ * every track's mark is cleared for the next lap. Counting only —
+ * no playback state is touched, so rendering is unaffected. (The
+ * pass measurement below is deliberately NOT aligned with this
+ * rule: the progress bar can reach 100% before or after the lap
+ * completes. Aligning the two is a separate change, if ever.) */
+MdxPlayer.prototype._lapJump = function (t) {
+  if (t.idx < this._lapHit.length) this._lapHit[t.idx] = true;
+  var any = false;
+  for (var i = 0; i < this.tracks.length; i++) {
+    var o = this.tracks[i];
+    if (o.dead || o.counter < 0) continue; /* ended: out of the set */
+    if (i >= 9 && !this.pcm8Mode) continue; /* extra PCM channels join only in PCM8 mode */
+    any = true;
+    if (!this._lapHit[i]) return; /* still waiting for this track */
+  }
+  if (!any) return;
+  this.lapCount++;
+  for (var j = 0; j < this._lapHit.length; j++) this._lapHit[j] = false;
 };
 /* ------------------------------------------------ pass measurement ---
  * Report-only (v36): measure one full pass of the loaded song —
@@ -2293,6 +2330,7 @@ MdxPlayer.prototype.parseEvent = function (t) {
         this.noteOff(t); return -1;
       }
       t.ptr = cmdPos + word + 3; this.loopCount++;
+      this._lapJump(t);
       return 0;
     }
     case 0xF0: /* key-on delay (MXDRV S001f): a per-channel setting;
@@ -2892,7 +2930,7 @@ MdxPlayer.prototype.getState = function () {
     playing: this.playing && !this.ended, ended: this.ended,
     tick: this.tickCount, elapsed: this.elapsed,
     tempo: this.tempo, tickMs: this.tickSeconds() * 1000,
-    loopCount: this.loopCount, levels: levels, keyOns: keyOns, notes: notes,
+    loopCount: this.lapCount, levels: levels, keyOns: keyOns, notes: notes,
     passTicks: passTicks, loopStartTick: loopStartTick, passTick: passTick,
     voices: voices, pans: pans,
     title: this.song ? this.song.title : '', nTracks: this.tracks.length
