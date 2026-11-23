@@ -4631,15 +4631,25 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let endedNotified = false;
       function showState(s) {
         if (!s) return;
-        /* Post-unload guard (v62, see staleReportGuard): drop a
-         * late 'playing' report from the unloaded song so it
-         * cannot redraw the title-adjacent displays, levels,
-         * keyboards or the play button; a stopped report clears
-         * the guard and falls through to settle the pending
-         * suspend exactly like after a plain stop. */
-        if (staleReportGuard && !cur.mdx) {
-          if (s.playing) return;
-          staleReportGuard = false;
+        /* Post-unload guard (v62, rule revised in v63 — see
+         * staleReportGuard): while no song is loaded, an ENGINE
+         * report is never used for rendering. The engine still
+         * holds the unloaded song, so even its final stop report
+         * carries the previous song's content (channel count,
+         * voice / pan, tempo / tick, pass length) and would
+         * redraw everything the unload just cleared. Engine
+         * reports always carry a tick — the same distinction
+         * updateProgress uses — while UI-made synthetic reports
+         * do not, and those still fall through, so e.g. the stop
+         * button's display reset keeps working after an unload.
+         * A dropped report is not passed to __mdxStateHook
+         * either (its loop count must not flow back in right
+         * after the clear zeroed it); a stopped engine report
+         * only settles the pending suspend before returning.
+         * The guard is released exclusively by loadSong. */
+        if (staleReportGuard && !cur.mdx && s.tick !== undefined) {
+          if (!s.playing) settleSuspendPending(s);
+          return;
         }
         /* Display-only: write to the DOM only when a value actually
          * changed, so repeated state reports with identical values
@@ -4941,13 +4951,15 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       const SUSPEND_COUNTDOWN_MS = 10000;
       let suspendPending = false;
       /* Set by the folder-clear unload (window.__mdxUnloadSong,
-       * v62): while no song is loaded, a state report that still
-       * claims 'playing' can only be a late report from the song
-       * that was just unloaded, so showState drops it instead of
-       * repainting the cleared displays. The first report that
-       * confirms the engine stopped clears the guard and is
-       * applied normally — the same settle rule armSuspendPending
-       * uses — and any new load clears it too (see loadSong). */
+       * v62; rule revised in v63): while no song is loaded,
+       * showState never renders an engine report — the engine
+       * still holds the unloaded song, so its reports, the final
+       * stop report included, carry the previous song's content
+       * and would redraw the cleared displays. Engine reports
+       * are told apart by always carrying a tick (the test
+       * updateProgress uses); UI-made synthetic reports have no
+       * tick and still render. A stopped engine report only runs
+       * settleSuspendPending. Only loadSong releases the guard. */
       let staleReportGuard = false;
       let suspendTimer = null;
       let suspendCountdownTimer = null;
@@ -5251,6 +5263,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           pdxBytes: pdxBytes, pdxLabel: pdx ? pdx.label : '',
           pdxMismatch: pdx ? pdx.mismatch : false, source
         };
+        const installedCur = cur; /* identity check for the generation bail below (v63) */
         describeSong();
         resetProgress(); /* the progress bar restarts empty for the new song, until its first state report */
         if (lzxExpanded) els.meta.textContent += ' ／ LZX圧縮ファイルを展開しました';
@@ -5262,7 +5275,25 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         staleReportGuard = false; /* a new load ends the post-unload guard */
         const be = await ensureAudio();
         if (!be) return;
-        if (loadGen !== null && window.__mdxFolderGen() !== loadGen) return; /* cleared mid-load: stay unloaded */
+        if (loadGen !== null && window.__mdxFolderGen() !== loadGen) {
+          /* Cleared mid-load: this load must not land (v62). It
+           * also unloads ITSELF when cur is still the object this
+           * load installed (v63): the clear only unloads a song
+           * it owns, so on the debug one-shot random path — where
+           * the previously loaded song was a manual one — cur has
+           * already been replaced above while the engine still
+           * holds the old song; without the self-unload the
+           * display would show the new song over the old one's
+           * playback. The identity check keeps an intervening
+           * load safe (clear, then a manual load during the
+           * await): its cur is a different object and is left
+           * alone. On the sequential path the clear has usually
+           * unloaded already, so cur no longer matches and this
+           * is a no-op — and a double unload would be harmless
+           * anyway (its stop + resets are idempotent). */
+          if (cur === installedCur && typeof window.__mdxUnloadSong === 'function') window.__mdxUnloadSong();
+          return;
+        }
         sendLoad(cur.mdx, cur.pdxBytes);
         sendMuteSolo();
         sendCmd('volume', els.vol.value / 100);
@@ -5287,8 +5318,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * no-song behaviour as at launch. User settings that live
        * across songs (volume, tempo rate, loop toggle) are NOT
        * reset. The stale-report guard is armed LAST, after the
-       * synthetic zero report below, so only genuinely late
-       * engine reports are dropped (see staleReportGuard). */
+       * synthetic zero report below, so that report still
+       * renders (see staleReportGuard). */
       window.__mdxUnloadSong = function () {
         sendCmd('stop'); /* engine playback stops / resets, parked or not */
         cur = {
@@ -5299,8 +5330,12 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         emptyFlags = [];
         closeVoicePanel();
         closeAnalysisPanel();
-        cuHide();
         buildChannels(9); /* launch-time channel rows: keyboards, @ / pan back to '—' */
+        /* Through the same hook loadSong uses, AFTER the rows are
+         * rebuilt and the solos are cleared (v63): the close-up's
+         * selected channel and suppression key must not linger —
+         * cuHide() alone left both behind. */
+        refreshMuteSoloDisplay();
         describeSong(); /* title / meta / PDX warning back to the no-song text */
         resetProgress();
         document.querySelectorAll('.song.playing').forEach((el) => el.classList.remove('playing'));
@@ -6584,16 +6619,18 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          playback auto-starts at the head; debug mode: it waits
          for a start button). The catalog itself is NOT part of
          the folder selection and stays loaded.
-         Playback is stopped only when the current song belongs
-         to the list (sequential / random mode live, parked
-         included, or a one-shot pick — see folderSongCurrent):
-         a parked song is already stopped, so the stop button is
-         clicked only while something may actually be sounding.
-         A song loaded from outside the list (manual file,
-         library) cleared folderSongCurrent when it loaded, so
-         its playback is left completely untouched. Pressing the
-         button with nothing selected only rewrites the status
-         lines — every reset below is a no-op then.
+         Playback handling applies only when the current song
+         belongs to the list (sequential / random mode live,
+         parked included, or a one-shot pick — see
+         folderSongCurrent): such a song is unloaded below, and
+         the unload sends its own stop — the stop button is not
+         clicked (v63; the button handler's synthetic report used
+         to defeat the post-unload guard). A song loaded from
+         outside the list (manual file, library) cleared
+         folderSongCurrent when it loaded, so its playback is
+         left completely untouched. Pressing the button with
+         nothing selected only rewrites the status lines — every
+         reset below is a no-op then.
          v62: the clear also bumps folderGen (see its declaration)
          so a load / pick / folder scan still in flight for this
          selection aborts instead of landing afterwards, and a
@@ -6604,18 +6641,29 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         folderGen++; /* v62: invalidate every in-flight load / pick / scan for this selection FIRST, before any stop handling can clear the flags they used to rely on */
         const hadSelection = !!((rootFiles && rootFiles.size) || folderSongs.length);
         const ownsSong = seqActive || contMode || folderSongCurrent;
-        if (ownsSong && !seqParked) {
-          const sb = $('btnStop');
-          if (sb) sb.click(); /* stops the engine; __mdxStopModes parks / turns off, both reset right below */
-        }
+        /* v63: the stop button is NOT clicked here any more. The
+         * unload below covers everything the click used to
+         * provide (its own stop command, the panel closes, the
+         * play-button reset, the suspend arm), and the mode
+         * teardown is done by stopSequential / setContMode(false)
+         * right below. The click's continuation — after its
+         * await ensureAudio() — used to feed a synthetic stop
+         * report into showState AFTER the unload, which released
+         * the stale-report guard early (so late 'playing' reports
+         * passed through) and left the main status at
+         * 「停止しました。」. ensureAudio is not missed either:
+         * with audio uninitialised there is nothing sounding to
+         * stop. While parked no final engine report arrives, so
+         * the unload's armed suspend settles through the ~1 s
+         * fallback timer instead of a confirming report. */
         startPending = null; /* a reserved debug start must not fire after the clear */
         if (contMode) setContMode(false);
         if (seqActive) stopSequential('');
         /* v62: a folder-derived song stays unloaded, not just
          * stopped — the player returns to its no-song state (the
-         * parked case reaches here without a stop click, so the
-         * hook sends its own stop command). Songs from outside
-         * the list (ownsSong false) are left completely alone. */
+         * hook sends its own stop command; since v63 the clear
+         * never clicks the stop button). Songs from outside the
+         * list (ownsSong false) are left completely alone. */
         if (ownsSong && typeof window.__mdxUnloadSong === 'function') window.__mdxUnloadSong();
         seqParked = false; seqBaseLoop = null; contBaseLoop = null;
         folderSongCurrent = false;
