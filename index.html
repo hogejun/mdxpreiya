@@ -800,6 +800,7 @@
           <input type="file" id="rootDirInput" webkitdirectory hidden />
           <button class="tbtn" id="btnRootFiles" type="button">ファイルをまとめて選ぶ</button>
           <input type="file" id="rootFilesInput" accept=".mdx,.pdx" multiple hidden />
+          <button class="tbtn" id="btnRootClear" type="button">選択をクリア</button>
         </div>
         <div class="filebox rootdrop" id="rootDrop">
           <p>MDX フォルダはここへの<strong>ドラッグ＆ドロップ</strong>でも読み込めます。アプリ内ブラウザのファイル選択ではフォルダが選べないため、その場合は Finder からコレクションのフォルダをここに落としてください。メーカー別フォルダを1つずつ落として追加していくこともできます。</p>
@@ -5384,7 +5385,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       const catEls = {
         status: $('catStatus'), fileInput: $('catFileInput'),
         rootStatus: $('rootStatus'), dirInput: $('rootDirInput'),
-        filesInput: $('rootFilesInput'), drop: $('rootDrop'),
+        filesInput: $('rootFilesInput'), drop: $('rootDrop'), rootClear: $('btnRootClear'),
         seqStart: $('btnSeqStart'), randomStart: $('btnRandomStart'), next: $('btnRandomNext'),
         info: $('randInfo'), rTitle: $('randTitle'), rMeta: $('randMeta'),
         rStatus: $('randStatus'),
@@ -5839,6 +5840,17 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          but sequential mode is only parked (position kept) so it
          can resume — see seqParked above. */
       let contMode = false;      /* continuous random mode ON/OFF */
+      let folderSongCurrent = false; /* the engine's current song came
+       * from the folder list (a sequential load or a random pick,
+       * including a one-shot pick with no mode running). Set by
+       * playFolderEntry / pickCatalogSong when their load commits,
+       * cleared by __mdxRandomOff — which loadSong calls for every
+       * load from OUTSIDE the list (manual files, library songs),
+       * so after such a load this is false even though a folder
+       * song may have played before. 「選択をクリア」 uses it to
+       * stop playback only when the playing / parked song belongs
+       * to the selection being forgotten, and to leave a manually
+       * loaded or library song playing untouched. */
       let contBusy = false;      /* re-entry guard while a pick is in flight */
       let contBaseLoop = null;   /* loopCount when the current pick started */
       let hookLastLoop = 0;      /* last loopCount seen, to spot song changes */
@@ -5879,6 +5891,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         updateAdvanceFlag();
       }
       window.__mdxRandomOff = function () {
+        folderSongCurrent = false; /* the load that leads here replaces (or tries to replace) the folder song with one from outside the list */
         const wasSeq = seqActive;
         if (seqActive) stopSequential('');
         if (!contMode) {
@@ -6183,6 +6196,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
         contBaseLoop = null; seqBaseLoop = null; /* the state hook re-captures them for this song */
         await loadSong(mdxBytes, entry.relpath, 'catalog', true, pdxOverride);
+        folderSongCurrent = true;
         if (seqActive) {
           const k = normKey(entry.relpath);
           seqAdopt(folderSongs.find((s) => s.key === k || s.key.endsWith('/' + k)) || null);
@@ -6257,6 +6271,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
         contBaseLoop = null; seqBaseLoop = null; /* the state hook re-captures them for this song */
         await loadSong(mdxBytes, pick.path, 'folder', true, pdxOverride);
+        folderSongCurrent = true;
         const modeNote = contMode ? '（連続ランダム再生中）' : (seqActive ? '（フォルダ順次再生中）' : '');
         if (pdxRef && !pdxOverride) {
           setRandStatus('再生中: ' + pick.name + '（参照 PDX「' + pdxRef + '」がフォルダ内に見つからず、FM のみ再生）' + modeNote);
@@ -6449,6 +6464,63 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (seqIndex <= 0) return;
         playSeqAt(seqIndex - 1, -1);
       });
+
+      /* ---------------- clear folder selection ----------------
+         「選択をクリア」 forgets everything the folder intakes
+         accumulated: the file index and the folder song list,
+         both modes' state, the sequential position / parked
+         state (so the prev/next buttons and the n / N display
+         go away with the list), the catalog draw's
+         present-in-folder list (rebuilt for an empty index: no
+         entries), the last random pick, and the debug skip log
+         (its entries describe songs of the selection being
+         forgotten). The additive intake itself is unchanged —
+         folders still merge into the index on every pick until
+         this button is pressed. After a clear, rootFiles is
+         null and both modes are off, so the next intake behaves
+         exactly like the first one (normal mode: sequential
+         playback auto-starts at the head; debug mode: it waits
+         for a start button). The catalog itself is NOT part of
+         the folder selection and stays loaded.
+         Playback is stopped only when the current song belongs
+         to the list (sequential / random mode live, parked
+         included, or a one-shot pick — see folderSongCurrent):
+         a parked song is already stopped, so the stop button is
+         clicked only while something may actually be sounding.
+         A song loaded from outside the list (manual file,
+         library) cleared folderSongCurrent when it loaded, so
+         its playback is left completely untouched. Pressing the
+         button with nothing selected only rewrites the status
+         lines — every reset below is a no-op then. */
+      function clearFolderSelection() {
+        const hadSelection = !!((rootFiles && rootFiles.size) || folderSongs.length);
+        const ownsSong = seqActive || contMode || folderSongCurrent;
+        if (ownsSong && !seqParked) {
+          const sb = $('btnStop');
+          if (sb) sb.click(); /* stops the engine; __mdxStopModes parks / turns off, both reset right below */
+        }
+        startPending = null; /* a reserved debug start must not fire after the clear */
+        if (contMode) setContMode(false);
+        if (seqActive) stopSequential('');
+        seqParked = false; seqBaseLoop = null; contBaseLoop = null;
+        folderSongCurrent = false;
+        hookLastLoop = 0;
+        rootFiles = null;
+        origPaths.clear();
+        lastRootName = '';
+        lastFolderPick = null;
+        rebuildFolderSongs(); /* no index: folderSongs becomes [] and no position is re-located */
+        catalogPresent = []; /* present-in-folder entries for an empty index */
+        if (catEls.info) catEls.info.hidden = true;
+        if (catEls.rTitle) catEls.rTitle.textContent = '';
+        if (catEls.rMeta) catEls.rMeta.textContent = '';
+        if (catEls.skipLog) { while (catEls.skipLog.firstChild) catEls.skipLog.removeChild(catEls.skipLog.firstChild); }
+        if (catEls.skipLogWrap) catEls.skipLogWrap.hidden = true;
+        updateSeqUi(); updateAdvanceFlag();
+        catEls.rootStatus.textContent = '選択をクリアしました。フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）';
+        setRandStatus(hadSelection || ownsSong ? '選択をクリアしました。' : '選択をクリアしました（選択済みのフォルダはありませんでした）。');
+      }
+      if (catEls.rootClear) catEls.rootClear.addEventListener('click', clearFolderSelection);
 
       if (DEBUG_ON) tryFetchCatalog();
     </script>
