@@ -4631,6 +4631,16 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let endedNotified = false;
       function showState(s) {
         if (!s) return;
+        /* Post-unload guard (v62, see staleReportGuard): drop a
+         * late 'playing' report from the unloaded song so it
+         * cannot redraw the title-adjacent displays, levels,
+         * keyboards or the play button; a stopped report clears
+         * the guard and falls through to settle the pending
+         * suspend exactly like after a plain stop. */
+        if (staleReportGuard && !cur.mdx) {
+          if (s.playing) return;
+          staleReportGuard = false;
+        }
         /* Display-only: write to the DOM only when a value actually
          * changed, so repeated state reports with identical values
          * cause no repaint at all. */
@@ -4930,6 +4940,15 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * rendering silence. */
       const SUSPEND_COUNTDOWN_MS = 10000;
       let suspendPending = false;
+      /* Set by the folder-clear unload (window.__mdxUnloadSong,
+       * v62): while no song is loaded, a state report that still
+       * claims 'playing' can only be a late report from the song
+       * that was just unloaded, so showState drops it instead of
+       * repainting the cleared displays. The first report that
+       * confirms the engine stopped clears the guard and is
+       * applied normally — the same settle rule armSuspendPending
+       * uses — and any new load clears it too (see loadSong). */
+      let staleReportGuard = false;
       let suspendTimer = null;
       let suspendCountdownTimer = null;
       function startSuspendCountdown() {
@@ -5189,6 +5208,16 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
 
       /* ---------------- song loading ---------------- */
       async function loadSong(mdxBytes, name, source, autoplay, pdxOverride) {
+        /* Folder-generation snapshot (v62): folder-derived loads
+         * ('folder' / 'catalog') remember the folder selection's
+         * generation; if 「選択をクリア」 bumps it while this load
+         * is in flight (the ensureAudio await below), the load
+         * must not land — the clear has already unloaded the
+         * player, and sendLoad(cur.mdx) would read the reset
+         * state. Loads from outside the folder list ignore the
+         * generation, as the clear does not touch them. */
+        const loadGen = (source === 'folder' || source === 'catalog')
+          && typeof window.__mdxFolderGen === 'function' ? window.__mdxFolderGen() : null;
         /* An LZX-compressed MDX is expanded before parsing; if the
          * expansion fails the load aborts here so garbage data
          * never reaches the engine. */
@@ -5230,8 +5259,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          * is still pending: the new song's own state reports (and
          * its end) drive the context from here. */
         cancelSuspendPending();
+        staleReportGuard = false; /* a new load ends the post-unload guard */
         const be = await ensureAudio();
         if (!be) return;
+        if (loadGen !== null && window.__mdxFolderGen() !== loadGen) return; /* cleared mid-load: stay unloaded */
         sendLoad(cur.mdx, cur.pdxBytes);
         sendMuteSolo();
         sendCmd('volume', els.vol.value / 100);
@@ -5241,6 +5272,44 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         else setStatus('読み込みました: ' + name);
         if (actx && actx.state !== 'running') setStatus('音声がブラウザに止められています。画面をクリック／タップすると再生が始まります。');
       }
+
+      /* ---------------- unload (folder clear, v62) ----------------
+       * Called by the folder script's 「選択をクリア」 when the
+       * song loaded in the player belongs to the folder selection
+       * being forgotten: the song is not only stopped but
+       * unloaded, so the player returns to its just-launched,
+       * no-song state and the play button can no longer
+       * single-play it. Deliberately built from the existing stop
+       * command plus UI state resets — the engine / worklet
+       * (#worklet-src) gains NO new command and stays untouched:
+       * 'stop' resets the engine's playback, and with cur.mdx
+       * null the play button's only path forward is the same
+       * no-song behaviour as at launch. User settings that live
+       * across songs (volume, tempo rate, loop toggle) are NOT
+       * reset. The stale-report guard is armed LAST, after the
+       * synthetic zero report below, so only genuinely late
+       * engine reports are dropped (see staleReportGuard). */
+      window.__mdxUnloadSong = function () {
+        sendCmd('stop'); /* engine playback stops / resets, parked or not */
+        cur = {
+          name: '', title: '', mdx: null, pdxName: '',
+          pdxBytes: null, pdxLabel: '', pdxMismatch: false, source: ''
+        };
+        chMute = []; chSolo = []; /* mute / solo cleared, as at launch */
+        emptyFlags = [];
+        closeVoicePanel();
+        closeAnalysisPanel();
+        cuHide();
+        buildChannels(9); /* launch-time channel rows: keyboards, @ / pan back to '—' */
+        describeSong(); /* title / meta / PDX warning back to the no-song text */
+        resetProgress();
+        document.querySelectorAll('.song.playing').forEach((el) => el.classList.remove('playing'));
+        reflectPlay(false);
+        showState({ elapsed: 0, tempo: null, tickMs: null, loopCount: 0, levels: chRows.map(() => 0), keyOns: chRows.map(() => false), playing: false });
+        sendMuteSolo();
+        staleReportGuard = true;
+        armSuspendPending(); /* same settle path as the stop button */
+      };
 
       /* ---------------- library list ---------------- */
       function addLibraryButtons(list, container) {
@@ -5405,6 +5474,20 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * end random mode with 「見つからない曲が続いた」 even though
        * the folder is full of playable songs. */
       let catalogPresent = [];
+
+      /* Folder-selection generation (v62). Bumped by every
+       * 「選択をクリア」; asynchronous work that belongs to the
+       * selection (song loads in playFolderEntry / pickCatalogSong,
+       * the playSeqAt / advanceRandom loops, folder scans feeding
+       * mergeRootFiles) snapshots it and compares after each
+       * await: a mismatch means the selection it was working for
+       * has been forgotten, so it bails out silently instead of
+       * landing a song, a status line or a whole folder index on
+       * top of the cleared state. Exposed for loadSong (UI
+       * script), which applies the same check to folder-derived
+       * loads across its own ensureAudio await. */
+      let folderGen = 0;
+      window.__mdxFolderGen = function () { return folderGen; };
 
       /* Catalog mode is debug-only: the same URL parameter as the
        * v31 check display (the development configuration)
@@ -5685,8 +5768,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           try {
             const dir = await window.showDirectoryPicker();
             catEls.rootStatus.textContent = 'フォルダ「' + dir.name + '」を走査中…';
+            const genAtScan = folderGen; /* v62: a clear during the scan discards its result */
             const map = new Map();
             await indexHandleTree(dir, '', map);
+            if (genAtScan !== folderGen) return; /* cleared while scanning: keep the cleared state and its status lines */
             addStrippedVariants(map);
             mergeRootFiles(map, dir.name);
           } catch (e) {
@@ -5752,6 +5837,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       catEls.drop.addEventListener('drop', async (e) => {
         const dt = e.dataTransfer;
         if (!dt) return;
+        const genAtScan = folderGen; /* v62: a clear during the scan discards its result */
         catEls.rootStatus.textContent = 'ドロップされたフォルダを走査中…';
         const map = new Map();
         const entries = [];
@@ -5767,6 +5853,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         } else if (dt.files && dt.files.length) {
           for (const f of Array.from(dt.files)) map.set(normKey(f.name), f);
         }
+        if (genAtScan !== folderGen) return; /* v62: cleared while scanning: keep the cleared state and its status lines */
         if (!map.size) {
           catEls.rootStatus.textContent = 'ドロップからファイルを取り込めませんでした。「ファイルをまとめて選ぶ」を試してください。';
           return;
@@ -6036,6 +6123,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * and path) must come back showing that same song. */
       async function playSeqAt(idx, dir) {
         if (seqBusy || !seqActive) return false;
+        const genAtStart = folderGen; /* v62: a clear during a load aborts the whole advance */
         const step = dir < 0 ? -1 : 1;
         const startIdx = idx;
         const originEnt = seqCurrentEnt, originKey = seqCurrentKey;
@@ -6049,6 +6137,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             seqBaseLoop = null;
             updateSeqUi(); updateAdvanceFlag();
             const res = await playFolderEntry(folderSongs[idx]);
+            if (genAtStart !== folderGen) return false; /* v62: cleared while loading — no success handling, no skip log, no park-restore */
             if (res && res.ok) {
               if (seqStopRequested) {
                 /* Stop was pressed while this song was loading:
@@ -6168,6 +6257,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       /* One catalog pick attempt (debug mode). Returns true when
        * a song was started. */
       async function pickCatalogSong() {
+        const genAtStart = folderGen; /* v62: same clear-during-load guard as playFolderEntry */
         /* Draw only from the catalog entries present in the
          * selected folder (see catalogPresent): every draw then
          * names a file findFile() can actually return. An empty
@@ -6194,8 +6284,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             } catch (e) { /* PDX が読めなければ FM のみで続行 */ }
           }
         }
+        if (genAtStart !== folderGen) return false; /* v62: cleared while reading — do not start the song */
         contBaseLoop = null; seqBaseLoop = null; /* the state hook re-captures them for this song */
         await loadSong(mdxBytes, entry.relpath, 'catalog', true, pdxOverride);
+        if (genAtStart !== folderGen) return false; /* v62: cleared inside loadSong's own awaits — stay unloaded */
         folderSongCurrent = true;
         if (seqActive) {
           const k = normKey(entry.relpath);
@@ -6223,6 +6315,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * failure object through their skip handling to the
        * debug-only skip log (logSkipError). */
       async function playFolderEntry(pick) {
+        const genAtStart = folderGen; /* v62: snapshot — a clear during the reads below aborts before loadSong */
         catEls.info.hidden = false;
         setRandStatus('読み込み中…');
         let mdxBytes;
@@ -6269,8 +6362,15 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             } catch (e) { /* PDX が読めなければ FM のみで続行 */ }
           }
         }
+        /* v62: the clear may have landed during the reads above
+         * (its findPdx view is already the emptied index) — do not
+         * start the forgotten folder's song at all. The 'aborted'
+         * kind is never logged: both callers check the generation
+         * themselves right after their await and bail first. */
+        if (genAtStart !== folderGen) return { ok: false, kind: 'aborted', message: '', path: pick.path, name: pick.name };
         contBaseLoop = null; seqBaseLoop = null; /* the state hook re-captures them for this song */
         await loadSong(mdxBytes, pick.path, 'folder', true, pdxOverride);
+        if (genAtStart !== folderGen) return { ok: false, kind: 'aborted', message: '', path: pick.path, name: pick.name }; /* cleared inside loadSong's own awaits: do not mark or announce a song the clear unloaded */
         folderSongCurrent = true;
         const modeNote = contMode ? '（連続ランダム再生中）' : (seqActive ? '（フォルダ順次再生中）' : '');
         if (pdxRef && !pdxOverride) {
@@ -6313,10 +6413,12 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * every attempt fails, turn the mode OFF and say why. */
       async function advanceRandom() {
         if (!randomAvailable() || contBusy) return;
+        const genAtStart = folderGen; /* v62: a clear during a draw aborts the whole advance */
         contBusy = true;
         try {
           for (let i = 0; i < 10; i++) {
             const r = await pickRandomSong();
+            if (genAtStart !== folderGen) return; /* v62: cleared while picking — no success handling, no skip log */
             if (r === true || (r && r.ok)) return;
             logSkipError(r); /* debug only: a failed draw is a skip here (catalog picks return plain booleans and log nothing) */
             if (!contMode) return; /* cancelled while picking */
@@ -6491,8 +6593,15 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          library) cleared folderSongCurrent when it loaded, so
          its playback is left completely untouched. Pressing the
          button with nothing selected only rewrites the status
-         lines — every reset below is a no-op then. */
+         lines — every reset below is a no-op then.
+         v62: the clear also bumps folderGen (see its declaration)
+         so a load / pick / folder scan still in flight for this
+         selection aborts instead of landing afterwards, and a
+         folder-derived song is unloaded from the player via
+         window.__mdxUnloadSong (not merely stopped), returning
+         the player to its no-song state. */
       function clearFolderSelection() {
+        folderGen++; /* v62: invalidate every in-flight load / pick / scan for this selection FIRST, before any stop handling can clear the flags they used to rely on */
         const hadSelection = !!((rootFiles && rootFiles.size) || folderSongs.length);
         const ownsSong = seqActive || contMode || folderSongCurrent;
         if (ownsSong && !seqParked) {
@@ -6502,6 +6611,12 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         startPending = null; /* a reserved debug start must not fire after the clear */
         if (contMode) setContMode(false);
         if (seqActive) stopSequential('');
+        /* v62: a folder-derived song stays unloaded, not just
+         * stopped — the player returns to its no-song state (the
+         * parked case reaches here without a stop click, so the
+         * hook sends its own stop command). Songs from outside
+         * the list (ownsSong false) are left completely alone. */
+        if (ownsSong && typeof window.__mdxUnloadSong === 'function') window.__mdxUnloadSong();
         seqParked = false; seqBaseLoop = null; contBaseLoop = null;
         folderSongCurrent = false;
         hookLastLoop = 0;
