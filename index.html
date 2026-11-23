@@ -820,7 +820,7 @@
           <p class="skiplog-head">スキップした曲（デバッグ表示）</p>
           <ul id="skipLog"></ul>
         </div>
-        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②読み込むと、フォルダ内（サブフォルダ含む）の MDX を相対パスの順に並べ、先頭から順に再生します。曲が終わると次の曲へ進み（ループ曲は1周したら次へ）、最後の曲が終わると停止します。参照 PDX があれば同じフォルダから自動で読み込みます。プレイヤーの「前の曲」／「次の曲」ボタンで前後の曲へ移動でき、その横の「n / N」とパスが一覧の中での位置です。Mac のデスクトップ前提です。</p>
+        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②読み込むと、フォルダ内（サブフォルダ含む）の MDX を相対パスの順に並べ、先頭から順に再生します。曲が終わると次の曲へ進み（ループ曲は1周したら次へ）、最後の曲が終わると停止します。参照 PDX があれば同じフォルダから自動で読み込みます。プレイヤーの「前の曲」／「次の曲」ボタンで前後の曲へ移動でき、その横の「n / N」とパスが一覧の中での位置です。フォルダの取り込みは追加方式で、選ぶたびに索引へ足されていきます。入れ替えたいときは「選択をクリア」を押してください。索引と順次再生の位置が消えて初回の状態に戻り、フォルダ由来の曲が読み込まれていれば止まってプレイヤーから下ろされます（手動で読み込んだ曲や収録曲はそのまま鳴り続けます）。Mac のデスクトップ前提です。</p>
       </section>
 
       <!-- ===================== notes ===================== -->
@@ -5252,8 +5252,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           mdxBytes = maybeExpandLzx(mdxBytes);
         } catch (e) { setStatus('LZX展開に失敗しました: ' + e.message); return; }
         /* A manually chosen song cancels continuous random mode;
-         * random picks (source 'catalog' / 'folder') keep it. */
-        if (source !== 'catalog' && source !== 'folder' && window.__mdxRandomOff) window.__mdxRandomOff();
+         * random picks (source 'catalog' / 'folder') keep it. The
+         * __mdxRandomOff call itself sits at the commit point
+         * further down, after every failure exit (v65) — see
+         * there. */
+        const outsideList = source !== 'catalog' && source !== 'folder';
         let info;
         try { info = MDXEngine.parseMDX(mdxBytes); }
         catch (e) { setStatus('MDX の読み込みに失敗しました: ' + e.message); return; }
@@ -5271,6 +5274,19 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             pdxBytes = maybeExpandLzx(pdxBytes);
           } catch (e) { setStatus('LZX展開に失敗しました: ' + e.message); return; }
         }
+        /* Commit point (v65): every failure exit of this load is
+         * behind it now — the MDX LZX expansion above, the MDX
+         * parse, and the PDX LZX expansion — so an outside-list
+         * load cancels the sequential / random modes and takes
+         * over the folder ownership HERE, and only here
+         * (__mdxRandomOff used to run before the parse). A load
+         * that failed above therefore changed nothing at all:
+         * the modes keep running, folderSongCurrent stays set,
+         * and the folder song keeps playing, so a later
+         * 「選択をクリア」 still stops and unloads it. A load
+         * that reaches here behaves exactly as before (v61):
+         * modes end and ownership moves to the new song. */
+        if (outsideList && window.__mdxRandomOff) window.__mdxRandomOff();
         cur = {
           name, title: info.title, mdx: mdxBytes, pdxName: info.pdxName,
           pdxBytes: pdxBytes, pdxLabel: pdx ? pdx.label : '',
@@ -5983,7 +5999,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * cleared by __mdxRandomOff — which loadSong calls for every
        * load from OUTSIDE the list (manual files, library songs),
        * so after such a load this is false even though a folder
-       * song may have played before. 「選択をクリア」 uses it to
+       * song may have played before. A FAILED outside load never
+       * clears it (v65): loadSong calls __mdxRandomOff only at
+       * its commit point, after every failure exit, so the
+       * folder song is still the engine's current song after a
+       * failed load. 「選択をクリア」 uses it to
        * stop playback only when the playing / parked song belongs
        * to the selection being forgotten, and to leave a manually
        * loaded or library song playing untouched. */
@@ -6027,7 +6047,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         updateAdvanceFlag();
       }
       window.__mdxRandomOff = function () {
-        folderSongCurrent = false; /* the load that leads here replaces (or tries to replace) the folder song with one from outside the list */
+        folderSongCurrent = false; /* the load that leads here has passed every failure exit and replaces the folder song with one from outside the list (v65: loadSong calls this only at its commit point) */
         const wasSeq = seqActive;
         if (seqActive) stopSequential('');
         if (!contMode) {
