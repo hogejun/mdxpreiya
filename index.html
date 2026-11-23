@@ -1773,9 +1773,9 @@ MdxPlayer.prototype.resetPlayback = function () {
   this.started = false;
 };
 /* ----------------------------------------------------- lap counting ---
- * v66: the song-level loop count. MXDRV itself has no such counter
- * (its channels loop independently); the rule adopted here stays
- * closest to that behaviour: lapCount advances by one when every
+ * v66: the song-level loop count, on the same rule as MXDRV's
+ * counter at L002246 (incremented at L0013e6 by the same rule):
+ * lapCount advances by one when every
  * track still playing has looped at least once since the last
  * advance. Called from the F1 loop jump (loop-enabled path only)
  * with the track that just jumped. The judgment runs only at a
