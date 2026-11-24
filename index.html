@@ -1639,6 +1639,17 @@ function MdxTrack(idx, startPtr, isPCM) {
   this.detune = 0; this.portamento = 0; this.portaStep = 0;
   this.loopDepth = 0; this.loopCounters = [];
   this.waiting = false; this.keyoffDisable = false;
+  /* v68: sync flag for EE/EF — MXDRV's per-track flag (L001498),
+   * raised by an EF that arrives while this track is NOT waiting
+   * and consumed by this track's next EE (see parseEvent cases
+   * 0xEF / 0xEE). Down at construction; tracks are rebuilt by
+   * resetPlayback, so every load / restart starts with it down.
+   * In-song loop jumps never pass through here, so a raised flag
+   * survives them until an EE consumes it. Invariant: a waiting
+   * track's flag is always down (a track only enters the wait via
+   * an EE whose flag was down, and an EF to a waiting track
+   * releases the wait without raising the flag). */
+  this.syncFlag = false;
   this.note = -1; this.keyOn = false;
   /* F0 key-on delay (MXDRV S001f setting / S0020 countdown): each note
    * copies the setting into the countdown and its key-on (FM) or sample
@@ -2337,12 +2348,34 @@ MdxPlayer.prototype.parseEvent = function (t) {
       * every following note copies it into its key-on countdown
       * (S0020) and sounds that many ticks late (see noteOn / tick). */
       t.keyOnDelay = d[t.ptr++]; return 0;
-    case 0xEF: /* sync send */
+    case 0xEF: /* sync send (v68: flag scheme) */
       v = d[t.ptr++];
-      if (v < this.tracks.length) this.tracks[v].waiting = false;
+      if (v < this.tracks.length) {
+        var syncDest = this.tracks[v];
+        /* Split on the destination's state. Waiting: release the
+         * wait on the spot, exactly as v67, and raise no flag —
+         * tracks are processed in number order once per tick, so
+         * the released track resumes on the same tick it would
+         * under MXDRV's flag check at the destination's own turn.
+         * Not waiting: raise the destination's flag instead (the
+         * one addition over v67), so its next EE passes through. */
+        if (syncDest.waiting) syncDest.waiting = false;
+        else syncDest.syncFlag = true;
+      }
+      /* Out-of-range destination: unchanged from v67 — wake every
+       * track waiting at this moment and raise no flag anywhere.
+       * (Known difference from MXDRV, which indexes its 16-entry
+       * flag array by the operand so an out-of-range EF raises a
+       * flag nobody may ever consume; deliberately not adopted.) */
       else for (var k = 0; k < this.tracks.length; k++) this.tracks[k].waiting = false;
       return 0;
-    case 0xEE: /* sync wait */
+    case 0xEE: /* sync wait (v68: flag scheme) */
+      /* Flag up: lower it and pass through without waiting. The EE
+       * is then a zero-length command — parsing continues with the
+       * next command in the same tick, unlike the waiting path
+       * below, whose return of 1 is just the parked counter value
+       * held while the track is skipped. */
+      if (t.syncFlag) { t.syncFlag = false; return 0; }
       t.waiting = true; return 1;
     case 0xED: /* FM: noise register / PCM: sampling-rate code */
       v = d[t.ptr++];
