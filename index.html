@@ -2215,6 +2215,7 @@ MdxPlayer.prototype.adjustVolume = function (t, delta) {
 MdxPlayer.prototype.parseEvent = function (t) {
   var d = this.song.data;
   var cmdPos = t.ptr;
+  if (!(t.ptr < d.length)) { this.noteOff(t); return -1; }
   var b = d[t.ptr++];
   var v, word;
   /* The legato (keyoff-disable) flag is NOT cleared here: MXDRV
@@ -2242,6 +2243,7 @@ MdxPlayer.prototype.parseEvent = function (t) {
   }
   if (b < 0xE0) { /* note */
     var len = d[t.ptr++];
+    if (len === undefined) { this.noteOff(t); return -1; }
     /* The flag is read as-is: if an F7 was parsed earlier in
      * this session (with any number of other commands between),
      * this note is legato, and noteOn sees the flag directly. */
@@ -2725,7 +2727,7 @@ MdxPlayer.prototype.tick = function () {
     if (t.dead && t.counter === 0) t.counter = -1;
     while (t.counter === 0 && !t.waiting && !this.ended) {
       var r = this.parseEvent(t);
-      if (r < 0) { t.counter = -1; t.dead = true; break; }
+      if (r < 0 || r !== r) { t.counter = -1; t.dead = true; break; }
       t.counter = r;
       if (++guard > 100000) { this.errors.push({ track: t.idx, offset: t.ptr, opcode: -1, tick: this.tickCount }); t.counter = -1; t.dead = true; break; }
     }
