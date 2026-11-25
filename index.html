@@ -6143,14 +6143,25 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       const safetyInput = $('safetyMinutes');
       if (safetyInput) {
-        safetyInput.addEventListener('input', () => {
+        /* The limit takes effect only when the entry is committed
+         * (the field loses focus, or Enter is pressed) — never
+         * while typing. A per-keystroke 'input' listener would
+         * arm the timer with half-typed values: retyping 15 as 20
+         * would apply 2 minutes at the first keystroke and could
+         * advance a song that has already sounded longer than
+         * that. The 'change' event fires exactly at commit (blur,
+         * and Enter in browsers that commit on Enter). */
+        safetyInput.addEventListener('change', () => {
           const v = parseFloat(safetyInput.value);
           if (isFinite(v) && v > 0) safetyLimitMin = v;
-        });
-        safetyInput.addEventListener('change', () => {
           /* Settle the field on the last valid value: an invalid
            * entry never reaches the timer. */
           safetyInput.value = String(safetyLimitMin);
+        });
+        /* Enter commits explicitly: blur() ends the edit, which
+         * fires 'change' and applies the value above. */
+        safetyInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') safetyInput.blur();
         });
       }
 
