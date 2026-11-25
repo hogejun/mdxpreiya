@@ -254,6 +254,11 @@
       .randinfo .rt { font-weight: 700; word-break: break-all; margin: 0 0 2px; }
       .randinfo .rm { color: var(--ink-dim); font-size: 0.86rem; margin: 0; word-break: break-all; }
       #randStatus { font-size: 0.88rem; min-height: 1.4em; margin-top: 10px; }
+      /* Time safety (v70): the per-song limit row in the folder panel. */
+      .safetyrow { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+      .safetyrow label { font-size: 0.86rem; color: var(--ink-dim); white-space: nowrap; }
+      .safetyrow input[type="number"] { width: 6em; font-size: 1rem; padding: 4px 6px; }
+      .safetyrow .safetynote { font-size: 0.8rem; color: var(--ink-dim); }
       /* Debug-only skip log: stays hidden unless the development flag produced
        * an entry (the wrapper's hidden attribute is only ever lifted
        * by logSkipError, which itself no-ops when not DEBUG_ON). */
@@ -806,6 +811,11 @@
           <p>MDX フォルダはここへの<strong>ドラッグ＆ドロップ</strong>でも読み込めます。アプリ内ブラウザのファイル選択ではフォルダが選べないため、その場合は Finder からコレクションのフォルダをここに落としてください。メーカー別フォルダを1つずつ落として追加していくこともできます。</p>
         </div>
         <p class="cat-status" id="rootStatus">フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）</p>
+        <div class="safetyrow">
+          <label for="safetyMinutes">時間の保険（1曲の再生時間の上限）</label>
+          <input type="number" id="safetyMinutes" min="0" step="any" value="15" inputmode="decimal" />
+          <span class="safetynote">分を超えたら次の曲へ進みます（順次再生とランダム再生のときだけ働きます）</span>
+        </div>
         <div class="cat-actions" id="randDebug" hidden>
           <button class="tbtn primary" id="btnSeqStart" type="button" aria-pressed="false">順次再生を開始</button>
           <button class="tbtn primary" id="btnRandomStart" type="button" aria-pressed="false">ランダム再生を開始</button>
@@ -6084,6 +6094,66 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let contBaseLoop = null;   /* loopCount when the current pick started */
       let hookLastLoop = 0;      /* last loopCount seen, to spot song changes */
 
+      /* ---------------- time safety (v70) ----------------
+       * A per-song wall-clock limit for the two continuous modes
+       * (sequential and debug random): when one song has been
+       * SOUNDING for the configured number of minutes, playback
+       * advances to the next song through the mode's own advance
+       * path (advanceSequential / advanceRandom, with their usual
+       * skip rules). Manual single-song playback never triggers
+       * it — no mode is active then — and it is independent of
+       * the loop toggle and of lap counting: it measures real
+       * elapsed time, not ticks or laps, so the tempo rate does
+       * not affect it either.
+       * The timing is driven by state reports, never by counting
+       * timer firings (a background tab throttles timers, which
+       * would delay the safety badly). On every report the hook
+       * adds the wall-clock interval since the previous report —
+       * but only when BOTH reports say playing: an interval that
+       * touches a pause / stop / end report is not sounding time,
+       * and a long gap whose non-playing report arrives late
+       * (background tab, suspended audio) must not be counted as
+       * playback. The check itself runs on report arrival.
+       * The accumulator resets to 0 when the song changes (loop
+       * count reset, or the elapsed clock moving backwards — a
+       * stop also restarts the elapsed clock, so a song resumed
+       * after a stop counts from 0), on stop / park
+       * (__mdxStopModes), when a manual load takes over
+       * (__mdxRandomOff), and on 「選択をクリア」. A pause does
+       * NOT reset it: paused intervals simply add nothing, and
+       * resuming continues the same count.
+       * The limit is a user setting like volume / tempo: held in
+       * memory only, kept across song loads and stops, default
+       * 15 minutes. Decimals are accepted (short values are how
+       * the safety is exercised in tests); an empty, non-numeric
+       * or non-positive entry falls back to the last valid value
+       * instead of ever being used as-is. */
+      let safetyLimitMin = 15;   /* the configured limit, in minutes */
+      let safetyPlayedSec = 0;   /* sounding seconds accumulated for the current song */
+      let safetyPrev = null;     /* { at, playing, elapsed } of the previous state report */
+      let safetyNotePending = false; /* a safety advance is in flight: the status line the advance produces carries the reason */
+      function safetyReset() { safetyPlayedSec = 0; safetyPrev = null; }
+      function safetyLimitLabel() {
+        return String(Math.round(safetyLimitMin * 1000) / 1000) + '分';
+      }
+      function takeSafetyNote(verb) {
+        if (!safetyNotePending) return '';
+        safetyNotePending = false;
+        return '（時間の保険：再生時間が設定の ' + safetyLimitLabel() + ' を超えたため、' + verb + '）';
+      }
+      const safetyInput = $('safetyMinutes');
+      if (safetyInput) {
+        safetyInput.addEventListener('input', () => {
+          const v = parseFloat(safetyInput.value);
+          if (isFinite(v) && v > 0) safetyLimitMin = v;
+        });
+        safetyInput.addEventListener('change', () => {
+          /* Settle the field on the last valid value: an invalid
+           * entry never reaches the timer. */
+          safetyInput.value = String(safetyLimitMin);
+        });
+      }
+
       /* A pick is possible when the folder list has songs, or when
        * debug catalog mode is fully ready (catalog + folder). The
        * buttons stay enabled either way: pressed with nothing to
@@ -6120,6 +6190,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         updateAdvanceFlag();
       }
       window.__mdxRandomOff = function () {
+        safetyReset(); /* v70: the timed song is over (a manual load takes over, or random mode stops) */
         folderSongCurrent = false; /* the load that leads here has passed every failure exit and replaces the folder song with one from outside the list (v65: loadSong calls this only at its commit point) */
         const wasSeq = seqActive;
         if (seqActive) stopSequential('');
@@ -6139,6 +6210,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
        * only when a song outside the list is loaded (the
        * __mdxRandomOff path in loadSong). */
       window.__mdxStopModes = function () {
+        safetyReset(); /* v70: a stop (park included) restarts the sounding-time count from 0 */
         if (contMode) { window.__mdxRandomOff(); return; }
         if (!seqActive) return;
         /* A sequential load is in flight: remember the stop so
@@ -6173,7 +6245,41 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const lcReset = lc < hookLastLoop;
         if (lcReset) { contBaseLoop = lc; seqBaseLoop = lc; } /* loopCount reset: a new song started */
         hookLastLoop = lc;
+        /* Time safety (v70): accumulate the sounding interval
+         * since the previous report (both reports playing only),
+         * resetting on a song change — the loop-count reset
+         * above, or the elapsed clock moving backwards (which a
+         * stop / restart also causes). This runs before the busy
+         * check so the previous-report record stays current even
+         * while an advance is in flight. */
+        {
+          const nowMs = performance.now();
+          const nowPlaying = !!s.playing;
+          const elNow = (typeof s.elapsed === 'number') ? s.elapsed : null;
+          const songChanged = lcReset || !!(safetyPrev && elNow !== null && safetyPrev.elapsed !== null && elNow < safetyPrev.elapsed - 0.05);
+          if (songChanged) safetyPlayedSec = 0;
+          else if (safetyPrev && safetyPrev.playing && nowPlaying) safetyPlayedSec += (nowMs - safetyPrev.at) / 1000;
+          safetyPrev = { at: nowMs, playing: nowPlaying, elapsed: elNow };
+        }
         if (contBusy || seqBusy) return false;
+        /* Time safety (v70): the limit is reached — advance
+         * through the active mode's own path and leave the
+         * reason for the status line the advance produces. While
+         * sequential mode is parked nothing fires (the stop that
+         * parked it already reset the count), and during the
+         * post-load confirming window the check simply runs
+         * again on the next report. */
+        if (safetyPlayedSec >= safetyLimitMin * 60) {
+          if (contMode) {
+            safetyPlayedSec = 0; safetyNotePending = true;
+            advanceRandom();
+            return true;
+          }
+          if (seqActive && !seqParked && !seqAwaitConfirm) {
+            safetyPlayedSec = 0; safetyNotePending = true;
+            return advanceSequential();
+          }
+        }
         if (contMode) {
           if (s.ended) { advanceRandom(); return true; }
           if (contBaseLoop === null) { if (s.playing) contBaseLoop = lc; return false; }
@@ -6353,6 +6459,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           else if (step < 0) msg = '読み込める曲が前にないため、元の位置に戻って停止しました。';
           else msg = 'フォルダ内の曲をすべて再生しました。元の位置に戻って停止しました。';
           if (fails > 0) msg += '（読み込めない ' + fails + ' 曲を飛ばしました）';
+          msg += takeSafetyNote('次の曲へ進もうとしました');
           setRandStatus(msg);
           return false;
         } finally { seqBusy = false; drainPendingStart(); }
@@ -6378,7 +6485,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (seqIndex >= folderSongs.length - 1) {
           const sb = $('btnStop');
           if (sb) sb.click(); /* stops the engine and parks via __mdxStopModes */
-          setRandStatus('フォルダ内の最後の曲が終わりました。');
+          setRandStatus('フォルダ内の最後の曲が終わりました。' + takeSafetyNote('ここで止めました'));
           return false;
         }
         playSeqAt(seqIndex + 1);
@@ -6441,6 +6548,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         } else {
           setRandStatus('再生中: ' + entry.filename + modeNote);
         }
+        const sn = takeSafetyNote('次の曲へ進みました');
+        if (sn) setRandStatus(catEls.rStatus.textContent + sn);
         return true;
       }
       /* Load and start one folder-list song (shared by sequential
@@ -6520,6 +6629,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         } else {
           setRandStatus('再生中: ' + pick.name + modeNote);
         }
+        const sn = takeSafetyNote('次の曲へ進みました');
+        if (sn) setRandStatus(catEls.rStatus.textContent + sn);
         return { ok: true };
       }
       /* One folder pick attempt (debug random). Draws from the
@@ -6566,7 +6677,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             if (!contMode) return; /* cancelled while picking */
           }
           setContMode(false);
-          setRandStatus('フォルダ内に見つからない曲が続いたため、連続ランダム再生を終了しました。');
+          setRandStatus('フォルダ内に見つからない曲が続いたため、連続ランダム再生を終了しました。' + takeSafetyNote('次の曲へ進もうとしました'));
         } finally { contBusy = false; drainPendingStart(); }
       }
       async function playRandomOnce() {
@@ -6775,6 +6886,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         seqParked = false; seqBaseLoop = null; contBaseLoop = null;
         folderSongCurrent = false;
         hookLastLoop = 0;
+        safetyReset(); safetyNotePending = false; /* v70: the clear restarts the sounding-time count */
         rootFiles = null;
         origPaths.clear();
         lastRootName = '';
