@@ -6102,6 +6102,27 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let contBusy = false;      /* re-entry guard while a pick is in flight */
       let contBaseLoop = null;   /* loopCount when the current pick started */
       let hookLastLoop = 0;      /* last loopCount seen, to spot song changes */
+      /* The loopCount baseline (contBaseLoop / seqBaseLoop) is
+       * only taken from a state report whose tick is at least
+       * LOOP_BASE_MIN_TICK. Songs whose tracks all head-jump
+       * (F1) to the body at the head produce an apparent lap
+       * very early — at tick 1 for 329 songs in the collection,
+       * and at tick 97 for JACK07, whose apparent lap completes
+       * only when a short genuine loop closes the set after the
+       * non-sounding tracks have ended. A baseline taken before
+       * that apparent lap completes (e.g. 0 from a tick-0
+       * report) makes the hook read the apparent lap itself as
+       * a completed lap and advance at the head of the song.
+       * 192 ticks is one bar of 4/4 (about 2-3 seconds) and
+       * leaves margin over the collection's worst case (97).
+       * The only cost is that a genuine short-loop song sounds
+       * one extra lap before advancing; songs that end are
+       * unaffected because they advance on the ended report.
+       * While the baseline is still null neither mode advances
+       * on loopCount (the same as the previous null handling),
+       * and a song that ends before tick 192 still advances on
+       * its ended report. */
+      const LOOP_BASE_MIN_TICK = 192;
 
       /* ---------------- time safety (v70) ----------------
        * A per-song wall-clock limit for the two continuous modes
@@ -6263,7 +6284,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (!s) return false;
         const lc = s.loopCount || 0;
         const lcReset = lc < hookLastLoop;
-        if (lcReset) { contBaseLoop = lc; seqBaseLoop = lc; } /* loopCount reset: a new song started */
+        if (lcReset) { contBaseLoop = null; seqBaseLoop = null; } /* loopCount reset: a new song started — do not take the baseline here; it is re-taken below only at tick >= LOOP_BASE_MIN_TICK */
         hookLastLoop = lc;
         /* Time safety (v70): accumulate the sounding interval
          * since the previous report (both reports playing only),
@@ -6302,7 +6323,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
         if (contMode) {
           if (s.ended) { advanceRandom(); return true; }
-          if (contBaseLoop === null) { if (s.playing) contBaseLoop = lc; return false; }
+          if (contBaseLoop === null) { if (s.playing && (s.tick || 0) >= LOOP_BASE_MIN_TICK) contBaseLoop = lc; return false; }
           if (lc > contBaseLoop) { advanceRandom(); return true; }
           return false;
         }
@@ -6328,11 +6349,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             if (!fresh) return false;
             seqAwaitConfirm = false; seqSwallowedEnd = false;
             if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
-            if (seqBaseLoop === null && s.playing) seqBaseLoop = lc;
+            if (seqBaseLoop === null && s.playing && (s.tick || 0) >= LOOP_BASE_MIN_TICK) seqBaseLoop = lc;
             return false;
           }
           if (s.ended) return advanceSequential();
-          if (seqBaseLoop === null) { if (s.playing) seqBaseLoop = lc; return false; }
+          if (seqBaseLoop === null) { if (s.playing && (s.tick || 0) >= LOOP_BASE_MIN_TICK) seqBaseLoop = lc; return false; }
           if (lc > seqBaseLoop) return advanceSequential();
         }
         return false;
