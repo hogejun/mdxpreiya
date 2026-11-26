@@ -2225,6 +2225,9 @@ MdxPlayer.prototype.adjustVolume = function (t, delta) {
 MdxPlayer.prototype.parseEvent = function (t) {
   var d = this.song.data;
   var cmdPos = t.ptr;
+  /* Out-of-range guard: with the read position at or past the end of the
+     data, end the track without reading (the same ending as F1 00). A
+     track may even start outside the data (e.g. ARC2_37 track 8). */
   if (!(t.ptr < d.length)) { this.noteOff(t); return -1; }
   var b = d[t.ptr++];
   var v, word;
@@ -2253,6 +2256,9 @@ MdxPlayer.prototype.parseEvent = function (t) {
   }
   if (b < 0xE0) { /* note */
     var len = d[t.ptr++];
+    /* Out-of-range guard: a note length byte outside the data makes the
+       length NaN, which froze the track for good (no lap, no end). End the
+       track without sounding the note instead (e.g. ARC2_37, ARCS24). */
     if (len === undefined) { this.noteOff(t); return -1; }
     /* The flag is read as-is: if an F7 was parsed earlier in
      * this session (with any number of other commands between),
@@ -2737,6 +2743,9 @@ MdxPlayer.prototype.tick = function () {
     if (t.dead && t.counter === 0) t.counter = -1;
     while (t.counter === 0 && !t.waiting && !this.ended) {
       var r = this.parseEvent(t);
+      /* Catch-all for the two guards above: a NaN returned by any other path
+         is treated as the end of the track, since a NaN remaining time would
+         stop the track forever. */
       if (r < 0 || r !== r) { t.counter = -1; t.dead = true; break; }
       t.counter = r;
       if (++guard > 100000) { this.errors.push({ track: t.idx, offset: t.ptr, opcode: -1, tick: this.tickCount }); t.counter = -1; t.dead = true; break; }
