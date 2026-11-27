@@ -572,34 +572,34 @@
     <main>
       <div class="console" id="consolePanel">
       <!-- ===================== channels ===================== -->
-      <section class="panel dsp" aria-label="チャンネル状態">
+      <section class="panel dsp" aria-label="チャンネル状態" data-i18n-aria="aria.channels">
         <p class="micro">Track Status</p>
         <div class="chhead">
-          <h2>チャンネル</h2>
-          <button class="tbtn" id="btnMsClear" type="button">ミュート／ソロ全解除</button>
+          <h2 data-i18n="ch.heading" data-i18n-force>チャンネル</h2>
+          <button class="tbtn" id="btnMsClear" type="button" data-i18n="ch.msClear" data-i18n-force>ミュート／ソロ全解除</button>
         </div>
-        <details class="chhelpbox"><summary>操作の説明（M／S・@n・パン・解析パネル）</summary><p class="chhelp">各行の M＝ミュート、S＝ソロ。ソロが1つでも ON のときはソロ以外は無音になり、ミュートが優先します（ミュート＋ソロは無音）。レベルメーターのクリックでもミュートを切り替えられます。曲を読み替えると全てリセットされます。各行の「@n」は現在の音色番号（PCM は最後に発音した PDX サンプルの番号）、その横の文字はパン（L／C／R、オフは「—」）です。FM 行の「@n」はクリックでき、その音色のパラメータ詳細パネルが開きます。チャンネル名（FM 1 など）をクリックすると解析パネルが開き、そのチャンネルのピッチ／音量トレースと LFO の状態が見られます。</p></details>
+        <details class="chhelpbox"><summary data-i18n="ch.helpSummary" data-i18n-force>操作の説明（M／S・@n・パン・解析パネル）</summary><p class="chhelp" data-i18n="ch.help" data-i18n-force>各行の M＝ミュート、S＝ソロ。ソロが1つでも ON のときはソロ以外は無音になり、ミュートが優先します（ミュート＋ソロは無音）。レベルメーターのクリックでもミュートを切り替えられます。曲を読み替えると全てリセットされます。各行の「@n」は現在の音色番号（PCM は最後に発音した PDX サンプルの番号）、その横の文字はパン（L／C／R、オフは「—」）です。FM 行の「@n」はクリックでき、その音色のパラメータ詳細パネルが開きます。チャンネル名（FM 1 など）をクリックすると解析パネルが開き、そのチャンネルのピッチ／音量トレースと LFO の状態が見られます。</p></details>
         <div class="chlist" id="chList"></div>
       </section>
       <div class="console-right">
       <!-- ===================== player ===================== -->
-      <section class="panel dsp" id="playerPanel" aria-label="プレイヤー">
+      <section class="panel dsp" id="playerPanel" aria-label="プレイヤー" data-i18n-aria="aria.player">
         <p class="micro">Now Playing</p>
-        <p class="now-title" id="nowTitle"><span class="now-title-inner" id="nowTitleInner">曲が選択されていません</span></p>
-        <p class="now-meta" id="nowMeta">下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。</p>
+        <p class="now-title" id="nowTitle"><span class="now-title-inner" id="nowTitleInner" lang="ja" data-i18n="player.noSong">曲が選択されていません</span></p>
+        <p class="now-meta" id="nowMeta" data-i18n="player.noSongHint">下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。</p>
         <div class="warnline" id="pdxWarn"></div>
         <div id="seqInfo" hidden>
-          <span id="seqPos" aria-label="フォルダ内での再生位置"></span>
-          <span id="seqPath"></span>
+          <span id="seqPos" aria-label="フォルダ内での再生位置" data-i18n-aria="aria.seqPos"></span>
+          <span id="seqPath" lang="ja"></span>
         </div>
-        <div class="prog" id="progBar" role="img" aria-label="再生位置（曲の1周分）"><div class="prog-fill" id="progFill"></div><div class="prog-loop" id="progLoop"></div></div>
+        <div class="prog" id="progBar" role="img" aria-label="再生位置（曲の1周分）" data-i18n-aria="aria.progress"><div class="prog-fill" id="progFill"></div><div class="prog-loop" id="progLoop"></div></div>
         <div class="transport">
-          <button class="tbtn primary" id="btnPlay" type="button">▶ 再生</button>
-          <button class="tbtn" id="btnStop" type="button">■ 停止</button>
-          <button class="tbtn" id="btnLoop" type="button" aria-pressed="true">ループ ON</button>
+          <button class="tbtn primary" id="btnPlay" type="button" data-i18n="btn.play">▶ 再生</button>
+          <button class="tbtn" id="btnStop" type="button" data-i18n="btn.stop" data-i18n-force>■ 停止</button>
+          <button class="tbtn" id="btnLoop" type="button" aria-pressed="true" data-i18n="btn.loopOn">ループ ON</button>
           <span id="seqUi" hidden>
-            <button class="tbtn" id="btnSeqPrev" type="button">前の曲</button>
-            <button class="tbtn" id="btnSeqNext" type="button">次の曲</button>
+            <button class="tbtn" id="btnSeqPrev" type="button" data-i18n="btn.prevSong" data-i18n-force>前の曲</button>
+            <button class="tbtn" id="btnSeqNext" type="button" data-i18n="btn.nextSong" data-i18n-force>次の曲</button>
           </span>
         </div>
         <div class="readout">
@@ -609,24 +609,24 @@
           <div class="stat"><div class="k">Loop Counter</div><div class="v" id="stLoop">0</div></div>
         </div>
         <div class="volrow">
-          <label for="vol">全体音量</label>
+          <label for="vol" data-i18n="label.volume" data-i18n-force>全体音量</label>
           <input type="range" id="vol" min="0" max="100" value="90" />
         </div>
         <div class="volrow">
-          <label for="tempoRate">テンポ</label>
+          <label for="tempoRate" data-i18n="label.tempo" data-i18n-force>テンポ</label>
           <input type="range" id="tempoRate" min="50" max="200" step="1" value="100" />
           <span class="tempoval" id="tempoVal">100%</span>
-          <button class="tbtn" id="btnTempoReset" type="button">100%に戻す</button>
+          <button class="tbtn" id="btnTempoReset" type="button" data-i18n="btn.tempoReset" data-i18n-force>100%に戻す</button>
         </div>
         <div id="status" role="status"></div>
       </section>
 
       <!-- ===================== spectrum ===================== -->
-      <section class="panel dsp" aria-label="スペクトラムアナライザ">
+      <section class="panel dsp" aria-label="スペクトラムアナライザ" data-i18n-aria="aria.spectrum">
         <p class="micro">Spectrum Analyzer</p>
         <div class="chhead">
-          <h2>スペクトラム</h2>
-          <span class="spec-note">マスター出力 ／ 対数軸 ／ 96 バンド</span>
+          <h2 data-i18n="spec.heading" data-i18n-force>スペクトラム</h2>
+          <span class="spec-note" data-i18n="spec.note" data-i18n-force>マスター出力 ／ 対数軸 ／ 96 バンド</span>
         </div>
         <div class="specwrap"><canvas id="specCanvas" aria-hidden="true"></canvas></div>
         <div class="spec-axis" aria-hidden="true">
@@ -646,65 +646,65 @@
       <div class="console-detail">
           <div class="detail-empty" id="detailEmpty">
             <p class="de-micro">Detail Monitor</p>
-            <p>FM 行の「@n」で音色パラメータ詳細、チャンネル名でチャンネル解析がここに開きます。</p>
+            <p data-i18n="detail.emptyHint" data-i18n-force>FM 行の「@n」で音色パラメータ詳細、チャンネル名でチャンネル解析がここに開きます。</p>
           </div>
           <!-- ===================== voice detail ===================== -->
-      <section class="panel dsp" id="voicePanel" aria-label="音色パラメータ詳細" hidden>
+      <section class="panel dsp" id="voicePanel" aria-label="音色パラメータ詳細" data-i18n-aria="aria.voicePanel" hidden>
         <p class="micro">Voice Parameter</p>
         <div class="chhead">
-          <h2 id="voicePanelTitle">音色パラメータ詳細</h2>
-          <button class="tbtn" id="btnVoiceClose" type="button">閉じる</button>
+          <h2 id="voicePanelTitle" data-i18n="voice.heading">音色パラメータ詳細</h2>
+          <button class="tbtn" id="btnVoiceClose" type="button" data-i18n="btn.close" data-i18n-force>閉じる</button>
         </div>
-        <p class="chhelp" id="voicePanelMeta">FM チャンネルの「@n」をクリックすると、その音色のパラメータがここに表示されます。</p>
+        <p class="chhelp" id="voicePanelMeta" data-i18n="voice.metaDefault">FM チャンネルの「@n」をクリックすると、その音色のパラメータがここに表示されます。</p>
         <div class="readout">
-          <div class="stat"><div class="k">チャンネル</div><div class="v" id="vstatCh">—</div></div>
-          <div class="stat"><div class="k">音色番号</div><div class="v" id="vstatNum">—</div></div>
-          <div class="stat"><div class="k">ALG（アルゴリズム）</div><div class="v" id="vstatAlg">—</div></div>
-          <div class="stat"><div class="k">FB（フィードバック）</div><div class="v" id="vstatFb">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.channel" data-i18n-force>チャンネル</div><div class="v" id="vstatCh">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.voiceNum" data-i18n-force>音色番号</div><div class="v" id="vstatNum">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.alg" data-i18n-force>ALG（アルゴリズム）</div><div class="v" id="vstatAlg">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.fb" data-i18n-force>FB（フィードバック）</div><div class="v" id="vstatFb">—</div></div>
         </div>
         <table class="voice-table" id="voiceTable">
-          <thead><tr><th scope="col">パラメータ</th><th scope="col">M1</th><th scope="col">M2</th><th scope="col">C1</th><th scope="col">C2</th></tr></thead>
+          <thead><tr><th scope="col" data-i18n="voice.thParam" data-i18n-force>パラメータ</th><th scope="col">M1</th><th scope="col">M2</th><th scope="col">C1</th><th scope="col">C2</th></tr></thead>
           <tbody id="voiceTbody"></tbody>
         </table>
-        <p class="chhelp" style="margin:0">オペレータは信号順（M1／M2／C1／C2）で表示しています。値はエンジンが実際に読み込んだ音色データ（MXDRV の @ 定義）をそのまま報告したもので、再生中に音色が切り替わると自動で追随します。TL は音色定義上の値です（キャリアの実際の TL は音量で変化します）。</p>
+        <p class="chhelp" style="margin:0" data-i18n="voice.footnote" data-i18n-force>オペレータは信号順（M1／M2／C1／C2）で表示しています。値はエンジンが実際に読み込んだ音色データ（MXDRV の @ 定義）をそのまま報告したもので、再生中に音色が切り替わると自動で追随します。TL は音色定義上の値です（キャリアの実際の TL は音量で変化します）。</p>
       </section>
 
       <!-- ===================== channel analysis ===================== -->
-      <section class="panel dsp" id="analysisPanel" aria-label="チャンネル解析" hidden>
+      <section class="panel dsp" id="analysisPanel" aria-label="チャンネル解析" data-i18n-aria="aria.analysisPanel" hidden>
         <p class="micro">Channel Analyzer</p>
         <div class="chhead">
-          <h2 id="analysisPanelTitle">チャンネル解析</h2>
-          <label class="spec-note" for="anChSel">対象</label>
-          <select id="anChSel" class="tbtn" aria-label="解析対象チャンネル"></select>
-          <button class="tbtn" id="btnAnClose" type="button">閉じる</button>
+          <h2 id="analysisPanelTitle" data-i18n="an.heading">チャンネル解析</h2>
+          <label class="spec-note" for="anChSel" data-i18n="an.targetLabel" data-i18n-force>対象</label>
+          <select id="anChSel" class="tbtn" aria-label="解析対象チャンネル" data-i18n-aria="aria.anChSel"></select>
+          <button class="tbtn" id="btnAnClose" type="button" data-i18n="btn.close" data-i18n-force>閉じる</button>
         </div>
-        <p class="chhelp" id="analysisPanelMeta">チャンネル名（FM 1 など）をクリックすると、そのチャンネルのピッチと音量の推移がここに表示されます。</p>
+        <p class="chhelp" id="analysisPanelMeta" data-i18n="an.metaDefault">チャンネル名（FM 1 など）をクリックすると、そのチャンネルのピッチと音量の推移がここに表示されます。</p>
         <div class="readout">
-          <div class="stat"><div class="k">公称ノート</div><div class="v" id="anStatNote">—</div></div>
-          <div class="stat"><div class="k">実効ピッチ (MIDI)</div><div class="v" id="anStatPitch">—</div></div>
-          <div class="stat"><div class="k">デチューン設定 (F3)</div><div class="v" id="anStatDetuneSet">—</div></div>
-          <div class="stat"><div class="k">ポルタメント (F2)</div><div class="v" id="anStatPorta">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.nominalNote" data-i18n-force>公称ノート</div><div class="v" id="anStatNote">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.effPitch" data-i18n-force>実効ピッチ (MIDI)</div><div class="v" id="anStatPitch">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.detuneSet" data-i18n-force>デチューン設定 (F3)</div><div class="v" id="anStatDetuneSet">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.portamento" data-i18n-force>ポルタメント (F2)</div><div class="v" id="anStatPorta">—</div></div>
         </div>
         <div class="anmeters">
           <div>
-            <p class="anlabel">デチューン（チューナー式メーター／単位 cent・中心付近を拡大した圧縮スケール）</p>
+            <p class="anlabel" data-i18n="an.labelDetune" data-i18n-force>デチューン（チューナー式メーター／単位 cent・中心付近を拡大した圧縮スケール）</p>
             <div class="meterwrap tuner"><canvas id="anTunerCanvas" aria-hidden="true"></canvas></div>
           </div>
           <div>
-            <p class="anlabel">実効音量（VU 式メーター／0 VU はレベル 0.70 基準）</p>
+            <p class="anlabel" data-i18n="an.labelVu" data-i18n-force>実効音量（VU 式メーター／0 VU はレベル 0.70 基準）</p>
             <div class="meterwrap vu"><canvas id="anVuCanvas" aria-hidden="true"></canvas></div>
           </div>
         </div>
-        <p class="anlabel">ピッチトレース（横線＝半音グリッド、破線＝公称ノート）</p>
+        <p class="anlabel" data-i18n="an.labelPitchTrace" data-i18n-force>ピッチトレース（横線＝半音グリッド、破線＝公称ノート）</p>
         <div class="anwrap"><canvas id="anPitchCanvas" aria-hidden="true"></canvas></div>
-        <p class="anlabel">音量トレース</p>
+        <p class="anlabel" data-i18n="an.labelVolTrace" data-i18n-force>音量トレース</p>
         <div class="anwrap"><canvas id="anVolCanvas" aria-hidden="true"></canvas></div>
         <div class="anlfo">
-          <div class="stat"><div class="k">ピッチ LFO（EC）</div><div class="v" id="anLfoPitch">—</div></div>
-          <div class="stat"><div class="k">音量 LFO（EB）</div><div class="v" id="anLfoVol">—</div></div>
-          <div class="stat"><div class="k">LFO ディレイ（E9）</div><div class="v" id="anLfoDelay">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.pitchLfo" data-i18n-force>ピッチ LFO（EC）</div><div class="v" id="anLfoPitch">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.volLfo" data-i18n-force>音量 LFO（EB）</div><div class="v" id="anLfoVol">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.lfoDelay" data-i18n-force>LFO ディレイ（E9）</div><div class="v" id="anLfoDelay">—</div></div>
         </div>
-        <p class="chhelp" style="margin:8px 0 0">トレースはエンジンが tick ごとに記録した直近の履歴（最大 640 tick）です。ピッチはチップへ実際に書かれた最終ピッチの換算値で、デチューン・ポルタメント・ピッチ LFO の揺れがそのまま出ます。読み値のうちデチューンと実効音量は針メーターで表示します（デチューンはチューナー式で、ビブラートでは針が左右に振れ、デチューンでは寄った位置に留まります。音量は VU 式で、針には VU 本来のバリスティクスを持たせてあるためトレモロでは針がポンピングします）。音量はレベルメーターと同じ実効レベルです。LFO などのパラメータ類は数値表示のままで、エンジンが保持している設定・現在値そのものです。</p>
+        <p class="chhelp" style="margin:8px 0 0" data-i18n="an.footnote" data-i18n-force>トレースはエンジンが tick ごとに記録した直近の履歴（最大 640 tick）です。ピッチはチップへ実際に書かれた最終ピッチの換算値で、デチューン・ポルタメント・ピッチ LFO の揺れがそのまま出ます。読み値のうちデチューンと実効音量は針メーターで表示します（デチューンはチューナー式で、ビブラートでは針が左右に振れ、デチューンでは寄った位置に留まります。音量は VU 式で、針には VU 本来のバリスティクスを持たせてあるためトレモロでは針がポンピングします）。音量はレベルメーターと同じ実効レベルです。LFO などのパラメータ類は数値表示のままで、エンジンが保持している設定・現在値そのものです。</p>
       </section>
       </div>
       </div>
@@ -715,55 +715,55 @@
            exactly one channel is soloed. Draggable by its header.
            案A vertical stack: header chips / big keyboard / needle
            meters / pitch trace / volume trace / voice parameters. -->
-      <section class="panel dsp closeup" id="closeupPanel" aria-label="ソロ・クローズアップ" hidden>
+      <section class="panel dsp closeup" id="closeupPanel" aria-label="ソロ・クローズアップ" data-i18n-aria="aria.closeup" hidden>
         <div class="cu-drag" id="cuDragHandle">
           <p class="micro">Solo Close-Up</p>
           <div class="chhead">
-            <h2 id="cuTitle">ソロ・クローズアップ</h2>
-            <button class="tbtn" id="btnCuClose" type="button" aria-label="クローズアップを閉じる">× 閉じる</button>
+            <h2 id="cuTitle" data-i18n="cu.heading">ソロ・クローズアップ</h2>
+            <button class="tbtn" id="btnCuClose" type="button" aria-label="クローズアップを閉じる" data-i18n-aria="aria.cuClose" data-i18n="btn.closeX" data-i18n-force>× 閉じる</button>
           </div>
           <div class="cu-readout">
-            <div class="stat"><div class="k">チャンネル</div><div class="v" id="cuStatCh">—</div></div>
-            <div class="stat"><div class="k">音色番号</div><div class="v" id="cuStatVoice">—</div></div>
-            <div class="stat"><div class="k">パン</div><div class="v" id="cuStatPan">—</div></div>
-            <div class="stat"><div class="k">現在のノート</div><div class="v" id="cuStatNote">—</div></div>
+            <div class="stat"><div class="k" data-i18n="stat.channel" data-i18n-force>チャンネル</div><div class="v" id="cuStatCh">—</div></div>
+            <div class="stat"><div class="k" data-i18n="stat.voiceNum" data-i18n-force>音色番号</div><div class="v" id="cuStatVoice">—</div></div>
+            <div class="stat"><div class="k" data-i18n="stat.pan" data-i18n-force>パン</div><div class="v" id="cuStatPan">—</div></div>
+            <div class="stat"><div class="k" data-i18n="stat.curNote" data-i18n-force>現在のノート</div><div class="v" id="cuStatNote">—</div></div>
           </div>
         </div>
         <div class="cu-readout" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
-          <div class="stat"><div class="k">実効ピッチ (MIDI)</div><div class="v" id="cuStatPitch">—</div></div>
-          <div class="stat"><div class="k">デチューン設定 (F3)</div><div class="v" id="cuStatDetuneSet">—</div></div>
-          <div class="stat"><div class="k">ポルタメント (F2)</div><div class="v" id="cuStatPorta">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.effPitch" data-i18n-force>実効ピッチ (MIDI)</div><div class="v" id="cuStatPitch">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.detuneSet" data-i18n-force>デチューン設定 (F3)</div><div class="v" id="cuStatDetuneSet">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.portamento" data-i18n-force>ポルタメント (F2)</div><div class="v" id="cuStatPorta">—</div></div>
         </div>
-        <p class="anlabel">鍵盤（現在音を中心に ±2 オクターブ／緑のマーカーはピッチの寄り）</p>
+        <p class="anlabel" data-i18n="cu.labelKeyboard" data-i18n-force>鍵盤（現在音を中心に ±2 オクターブ／緑のマーカーはピッチの寄り）</p>
         <div class="cu-kbwrap"><canvas id="cuKbCanvas" aria-hidden="true"></canvas></div>
         <div class="cu-meters">
           <div>
-            <p class="anlabel">デチューン（チューナー式メーター／単位 cent）</p>
+            <p class="anlabel" data-i18n="cu.labelDetune" data-i18n-force>デチューン（チューナー式メーター／単位 cent）</p>
             <div class="meterwrap tuner"><canvas id="cuTunerCanvas" aria-hidden="true"></canvas></div>
           </div>
           <div>
-            <p class="anlabel">実効音量（VU 式メーター／0 VU はレベル 0.70 基準）</p>
+            <p class="anlabel" data-i18n="an.labelVu" data-i18n-force>実効音量（VU 式メーター／0 VU はレベル 0.70 基準）</p>
             <div class="meterwrap vu"><canvas id="cuVuCanvas" aria-hidden="true"></canvas></div>
           </div>
         </div>
-        <p class="anlabel">ピッチトレース（横線＝半音グリッド、破線＝公称ノート）</p>
+        <p class="anlabel" data-i18n="an.labelPitchTrace" data-i18n-force>ピッチトレース（横線＝半音グリッド、破線＝公称ノート）</p>
         <div class="anwrap"><canvas id="cuPitchCanvas" aria-hidden="true"></canvas></div>
-        <p class="anlabel">音量トレース</p>
+        <p class="anlabel" data-i18n="an.labelVolTrace" data-i18n-force>音量トレース</p>
         <div class="anwrap"><canvas id="cuVolCanvas" aria-hidden="true"></canvas></div>
         <div class="anlfo">
-          <div class="stat"><div class="k">ピッチ LFO（EC）</div><div class="v" id="cuLfoPitch">—</div></div>
-          <div class="stat"><div class="k">音量 LFO（EB）</div><div class="v" id="cuLfoVol">—</div></div>
-          <div class="stat"><div class="k">LFO ディレイ（E9）</div><div class="v" id="cuLfoDelay">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.pitchLfo" data-i18n-force>ピッチ LFO（EC）</div><div class="v" id="cuLfoPitch">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.volLfo" data-i18n-force>音量 LFO（EB）</div><div class="v" id="cuLfoVol">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.lfoDelay" data-i18n-force>LFO ディレイ（E9）</div><div class="v" id="cuLfoDelay">—</div></div>
         </div>
-        <p class="anlabel">音色パラメータ</p>
+        <p class="anlabel" data-i18n="cu.labelVoiceParams" data-i18n-force>音色パラメータ</p>
         <p class="chhelp" id="cuVoiceMeta">—</p>
         <div class="cu-readout" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
-          <div class="stat"><div class="k">音色番号</div><div class="v" id="cuStatNum">—</div></div>
-          <div class="stat"><div class="k">ALG（アルゴリズム）</div><div class="v" id="cuStatAlg">—</div></div>
-          <div class="stat"><div class="k">FB（フィードバック）</div><div class="v" id="cuStatFb">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.voiceNum" data-i18n-force>音色番号</div><div class="v" id="cuStatNum">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.alg" data-i18n-force>ALG（アルゴリズム）</div><div class="v" id="cuStatAlg">—</div></div>
+          <div class="stat"><div class="k" data-i18n="stat.fb" data-i18n-force>FB（フィードバック）</div><div class="v" id="cuStatFb">—</div></div>
         </div>
         <table class="voice-table" id="cuVoiceTable">
-          <thead><tr><th scope="col">パラメータ</th><th scope="col">M1</th><th scope="col">M2</th><th scope="col">C1</th><th scope="col">C2</th></tr></thead>
+          <thead><tr><th scope="col" data-i18n="voice.thParam" data-i18n-force>パラメータ</th><th scope="col">M1</th><th scope="col">M2</th><th scope="col">C1</th><th scope="col">C2</th></tr></thead>
           <tbody id="cuVoiceTbody"></tbody>
         </table>
       </section>
@@ -781,18 +781,18 @@
       </section>
 
       <!-- ===================== file load ===================== -->
-      <section class="panel" aria-label="ファイル読み込み">
-        <h2>自分の MDX ファイルを読み込む</h2>
+      <section class="panel" aria-label="ファイル読み込み" data-i18n-aria="aria.fileLoad">
+        <h2 data-i18n="file.heading" data-i18n-force>自分の MDX ファイルを読み込む</h2>
         <div class="filebox" id="dropBox">
-          <label class="filelabel" for="fileInput">ファイルを選ぶ（.mdx / .pdx）</label>
+          <label class="filelabel" for="fileInput" data-i18n="file.choose" data-i18n-force>ファイルを選ぶ（.mdx / .pdx）</label>
           <input type="file" id="fileInput" accept=".mdx,.pdx" multiple hidden />
-          <p>ここへのドラッグ＆ドロップでも読み込めます（PC の場合）。PCM を使う曲は .pdx も一緒に選んでください。</p>
+          <p data-i18n="file.dropHint" data-i18n-force>ここへのドラッグ＆ドロップでも読み込めます（PC の場合）。PCM を使う曲は .pdx も一緒に選んでください。</p>
         </div>
       </section>
 
       <!-- ===================== folder & random ===================== -->
-      <section class="panel" aria-label="フォルダと順次再生">
-        <h2>フォルダ再生（順次再生）</h2>
+      <section class="panel" aria-label="フォルダと順次再生" data-i18n-aria="aria.folderPanel">
+        <h2 data-i18n="folder.heading" data-i18n-force>フォルダ再生（順次再生）</h2>
         <div id="catDebug" hidden>
           <p class="cat-status" id="catStatus" style="margin-top:0">カタログを読み込んでいます…</p>
           <div class="cat-actions">
@@ -801,36 +801,47 @@
           </div>
         </div>
         <div class="cat-actions">
-          <button class="tbtn" id="btnRootPick" type="button">MDX フォルダを選ぶ</button>
+          <button class="tbtn" id="btnRootPick" type="button" data-i18n="folder.pickFolder" data-i18n-force>MDX フォルダを選ぶ</button>
           <input type="file" id="rootDirInput" webkitdirectory hidden />
-          <button class="tbtn" id="btnRootFiles" type="button">ファイルをまとめて選ぶ</button>
+          <button class="tbtn" id="btnRootFiles" type="button" data-i18n="folder.pickFiles" data-i18n-force>ファイルをまとめて選ぶ</button>
           <input type="file" id="rootFilesInput" accept=".mdx,.pdx" multiple hidden />
-          <button class="tbtn" id="btnRootClear" type="button">選択をクリア</button>
+          <button class="tbtn" id="btnRootClear" type="button" data-i18n="folder.clear" data-i18n-force>選択をクリア</button>
         </div>
         <div class="filebox rootdrop" id="rootDrop">
-          <p>MDX フォルダはここへの<strong>ドラッグ＆ドロップ</strong>でも読み込めます。アプリ内ブラウザのファイル選択ではフォルダが選べないため、その場合は Finder からコレクションのフォルダをここに落としてください。メーカー別フォルダを1つずつ落として追加していくこともできます。</p>
+          <p data-i18n-html="folder.dropHint">MDX フォルダはここへの<strong>ドラッグ＆ドロップ</strong>でも読み込めます。アプリ内ブラウザのファイル選択ではフォルダが選べないため、その場合は Finder からコレクションのフォルダをここに落としてください。メーカー別フォルダを1つずつ落として追加していくこともできます。</p>
         </div>
-        <p class="cat-status" id="rootStatus">フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）</p>
+        <p class="cat-status" id="rootStatus" data-i18n="folder.noSelection">フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）</p>
         <div class="safetyrow">
-          <label for="safetyMinutes">時間の保険（1曲の再生時間の上限）</label>
+          <label for="safetyMinutes" data-i18n="safety.label" data-i18n-force>時間の保険（1曲の再生時間の上限）</label>
           <input type="number" id="safetyMinutes" min="0" step="any" value="15" inputmode="decimal" />
-          <span class="safetynote">分を超えたら次の曲へ進みます（順次再生とランダム再生のときだけ働きます）</span>
+          <span class="safetynote" data-i18n="safety.note" data-i18n-force>分を超えたら次の曲へ進みます（順次再生とランダム再生のときだけ働きます）</span>
         </div>
         <div class="cat-actions" id="randDebug" hidden>
           <button class="tbtn primary" id="btnSeqStart" type="button" aria-pressed="false">順次再生を開始</button>
           <button class="tbtn primary" id="btnRandomStart" type="button" aria-pressed="false">ランダム再生を開始</button>
           <button class="tbtn" id="btnRandomNext" type="button">次のランダム</button>
         </div>
+        <div id="langDebug" hidden>
+          <div class="safetyrow">
+            <label for="langSel" data-i18n="lang.selectLabel" data-i18n-force>表示言語（デバッグ用）</label>
+            <select id="langSel" class="tbtn">
+              <option value="auto">Auto</option>
+              <option value="ja">日本語</option>
+              <option value="en">English</option>
+              <option value="sv">Svenska</option>
+            </select>
+          </div>
+        </div>
         <div class="randinfo" id="randInfo" hidden>
-          <p class="rt" id="randTitle"></p>
-          <p class="rm" id="randMeta"></p>
+          <p class="rt" id="randTitle" lang="ja"></p>
+          <p class="rm" id="randMeta" lang="ja"></p>
         </div>
         <div id="randStatus" role="status"></div>
         <div id="skipLogWrap" hidden>
           <p class="skiplog-head">スキップした曲（デバッグ表示）</p>
           <ul id="skipLog"></ul>
         </div>
-        <p class="cat-howto">使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②読み込むと、フォルダ内（サブフォルダ含む）の MDX を相対パスの順に並べ、先頭から順に再生します。曲が終わると次の曲へ進み（ループ曲は1周したら次へ）、最後の曲が終わると停止します。参照 PDX があれば同じフォルダから自動で読み込みます。プレイヤーの「前の曲」／「次の曲」ボタンで前後の曲へ移動でき、その横の「n / N」とパスが一覧の中での位置です。フォルダの取り込みは追加方式で、選ぶたびに索引へ足されていきます。入れ替えたいときは「選択をクリア」を押してください。索引と順次再生の位置が消えて初回の状態に戻り、フォルダ由来の曲が読み込まれていれば止まってプレイヤーから下ろされます（手動で読み込んだ曲や収録曲はそのまま鳴り続けます）。Mac のデスクトップ前提です。</p>
+        <p class="cat-howto" data-i18n="folder.howto" data-i18n-force>使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②読み込むと、フォルダ内（サブフォルダ含む）の MDX を相対パスの順に並べ、先頭から順に再生します。曲が終わると次の曲へ進み（ループ曲は1周したら次へ）、最後の曲が終わると停止します。参照 PDX があれば同じフォルダから自動で読み込みます。プレイヤーの「前の曲」／「次の曲」ボタンで前後の曲へ移動でき、その横の「n / N」とパスが一覧の中での位置です。フォルダの取り込みは追加方式で、選ぶたびに索引へ足されていきます。入れ替えたいときは「選択をクリア」を押してください。索引と順次再生の位置が消えて初回の状態に戻り、フォルダ由来の曲が読み込まれていれば止まってプレイヤーから下ろされます（手動で読み込んだ曲や収録曲はそのまま鳴り続けます）。Mac のデスクトップ前提です。</p>
       </section>
 
       <!-- ===================== notes ===================== -->
@@ -838,11 +849,11 @@
       <!-- ===================== references ===================== -->
 
       <!-- ===================== about ===================== -->
-      <section class="panel expl" aria-label="解説">
-        <h2>MDX と音源チップについて</h2>
-        <p><b>MDX / MXDRV</b> — X68000（シャープ, 1987）で広く使われた音楽ドライバ MXDRV の演奏データ形式。MML（Music Macro Language）をコンパイルしたもので、タイトル、FM 音色データ、9〜16 トラック分の演奏データを含む。データは 68000 のビッグエンディアンで格納されている。</p>
-        <p><b>YM2151 (OPM)</b> — X68000 内蔵の FM 音源チップ。4 オペレータ×8 チャンネル、8 アルゴリズム、フィードバック、AM/PM 対応のハードウェア LFO を備え、アーケード基板でも多用された。X68000 では 4 MHz で駆動され、ネイティブの生成レートは 62.5 kHz。本ページでは、現在の MAME が採用する ymfm そのものを WebAssembly（libymfm.wasm）として埋め込み、レジスタ駆動で鳴らしている。</p>
-        <p><b>MSM6258</b> — X68000 内蔵の ADPCM 音源。4bit ADPCM サンプルを PDX ファイルから読み、ドラムや効果音を 1 チャンネル（PCM8 モードでは多重再生）で鳴らす。X68000 ではクロック 4 MHz、サンプリング周波数は 3.9k〜15.6kHz。</p>
+      <section class="panel expl" aria-label="解説" data-i18n-aria="aria.about">
+        <h2 data-i18n-html="about.1">MDX と音源チップについて</h2>
+        <p data-i18n-html="about.2"><b>MDX / MXDRV</b> — X68000（シャープ, 1987）で広く使われた音楽ドライバ MXDRV の演奏データ形式。MML（Music Macro Language）をコンパイルしたもので、タイトル、FM 音色データ、9〜16 トラック分の演奏データを含む。データは 68000 のビッグエンディアンで格納されている。</p>
+        <p data-i18n-html="about.3"><b>YM2151 (OPM)</b> — X68000 内蔵の FM 音源チップ。4 オペレータ×8 チャンネル、8 アルゴリズム、フィードバック、AM/PM 対応のハードウェア LFO を備え、アーケード基板でも多用された。X68000 では 4 MHz で駆動され、ネイティブの生成レートは 62.5 kHz。本ページでは、現在の MAME が採用する ymfm そのものを WebAssembly（libymfm.wasm）として埋め込み、レジスタ駆動で鳴らしている。</p>
+        <p data-i18n-html="about.4"><b>MSM6258</b> — X68000 内蔵の ADPCM 音源。4bit ADPCM サンプルを PDX ファイルから読み、ドラムや効果音を 1 チャンネル（PCM8 モードでは多重再生）で鳴らす。X68000 ではクロック 4 MHz、サンプリング周波数は 3.9k〜15.6kHz。</p>
       </section>
 
       <footer>FM コア: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka)、BSD-3-Clause</footer>
@@ -3190,6 +3201,676 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
 
     <script>
       'use strict';
+      /* ================================================================
+       * i18n (v74, UI side only): message catalog with three languages.
+       * - Language resolution: debug select override (session only)
+       *   > ?lang=ja|en|sv > auto-detect from navigator.languages
+       *   (first prefix match of ja / sv / en) > English fallback.
+       * - tr(key, params) replaces {name} placeholders. A missing key
+       *   falls back to English, then to Japanese.
+       * - Static text uses data-i18n / data-i18n-html / data-i18n-aria
+       *   attributes, applied by applyI18n() at startup and on switch.
+       *   Elements whose text is set dynamically are only re-applied
+       *   while their current text is still one of the catalog values
+       *   (or when marked data-i18n-force), so already-displayed
+       *   status text is never re-translated mid-flight.
+       * ================================================================ */
+      const I18N = {
+  "ja": {
+    "doc.title": "MDXプレイヤー",
+    "aria.channels": "チャンネル状態",
+    "aria.player": "プレイヤー",
+    "aria.spectrum": "スペクトラムアナライザ",
+    "aria.voicePanel": "音色パラメータ詳細",
+    "aria.analysisPanel": "チャンネル解析",
+    "aria.anChSel": "解析対象チャンネル",
+    "aria.closeup": "ソロ・クローズアップ",
+    "aria.cuClose": "クローズアップを閉じる",
+    "aria.library": "収録曲",
+    "aria.fileLoad": "ファイル読み込み",
+    "aria.folderPanel": "フォルダと順次再生",
+    "aria.notes": "注記",
+    "aria.refs": "参照実装にもとづく作り直し",
+    "aria.about": "解説",
+    "aria.seqPos": "フォルダ内での再生位置",
+    "aria.progress": "再生位置（曲の1周分）",
+    "ch.heading": "チャンネル",
+    "ch.msClear": "ミュート／ソロ全解除",
+    "ch.helpSummary": "操作の説明（M／S・@n・パン・解析パネル）",
+    "ch.help": "各行の M＝ミュート、S＝ソロ。ソロが1つでも ON のときはソロ以外は無音になり、ミュートが優先します（ミュート＋ソロは無音）。レベルメーターのクリックでもミュートを切り替えられます。曲を読み替えると全てリセットされます。各行の「@n」は現在の音色番号（PCM は最後に発音した PDX サンプルの番号）、その横の文字はパン（L／C／R、オフは「—」）です。FM 行の「@n」はクリックでき、その音色のパラメータ詳細パネルが開きます。チャンネル名（FM 1 など）をクリックすると解析パネルが開き、そのチャンネルのピッチ／音量トレースと LFO の状態が見られます。",
+    "player.noSong": "曲が選択されていません",
+    "player.noSongHint": "下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。",
+    "btn.play": "▶ 再生",
+    "btn.pause": "❚❚ 一時停止",
+    "btn.stop": "■ 停止",
+    "btn.loopOn": "ループ ON",
+    "btn.loopOff": "ループ OFF",
+    "btn.prevSong": "前の曲",
+    "btn.nextSong": "次の曲",
+    "btn.close": "閉じる",
+    "btn.closeX": "× 閉じる",
+    "btn.tempoReset": "100%に戻す",
+    "label.volume": "全体音量",
+    "label.tempo": "テンポ",
+    "spec.heading": "スペクトラム",
+    "spec.note": "マスター出力 ／ 対数軸 ／ 96 バンド",
+    "voice.heading": "音色パラメータ詳細",
+    "voice.metaDefault": "FM チャンネルの「@n」をクリックすると、その音色のパラメータがここに表示されます。",
+    "voice.footnote": "オペレータは信号順（M1／M2／C1／C2）で表示しています。値はエンジンが実際に読み込んだ音色データ（MXDRV の @ 定義）をそのまま報告したもので、再生中に音色が切り替わると自動で追随します。TL は音色定義上の値です（キャリアの実際の TL は音量で変化します）。",
+    "stat.channel": "チャンネル",
+    "stat.voiceNum": "音色番号",
+    "stat.alg": "ALG（アルゴリズム）",
+    "stat.fb": "FB（フィードバック）",
+    "stat.pan": "パン",
+    "stat.curNote": "現在のノート",
+    "stat.nominalNote": "公称ノート",
+    "stat.effPitch": "実効ピッチ (MIDI)",
+    "stat.detuneSet": "デチューン設定 (F3)",
+    "stat.portamento": "ポルタメント (F2)",
+    "stat.pitchLfo": "ピッチ LFO（EC）",
+    "stat.volLfo": "音量 LFO（EB）",
+    "stat.lfoDelay": "LFO ディレイ（E9）",
+    "voice.thParam": "パラメータ",
+    "an.heading": "チャンネル解析",
+    "an.targetLabel": "対象",
+    "an.metaDefault": "チャンネル名（FM 1 など）をクリックすると、そのチャンネルのピッチと音量の推移がここに表示されます。",
+    "an.labelDetune": "デチューン（チューナー式メーター／単位 cent・中心付近を拡大した圧縮スケール）",
+    "an.labelVu": "実効音量（VU 式メーター／0 VU はレベル 0.70 基準）",
+    "an.labelPitchTrace": "ピッチトレース（横線＝半音グリッド、破線＝公称ノート）",
+    "an.labelVolTrace": "音量トレース",
+    "an.footnote": "トレースはエンジンが tick ごとに記録した直近の履歴（最大 640 tick）です。ピッチはチップへ実際に書かれた最終ピッチの換算値で、デチューン・ポルタメント・ピッチ LFO の揺れがそのまま出ます。読み値のうちデチューンと実効音量は針メーターで表示します（デチューンはチューナー式で、ビブラートでは針が左右に振れ、デチューンでは寄った位置に留まります。音量は VU 式で、針には VU 本来のバリスティクスを持たせてあるためトレモロでは針がポンピングします）。音量はレベルメーターと同じ実効レベルです。LFO などのパラメータ類は数値表示のままで、エンジンが保持している設定・現在値そのものです。",
+    "detail.emptyHint": "FM 行の「@n」で音色パラメータ詳細、チャンネル名でチャンネル解析がここに開きます。",
+    "cu.heading": "ソロ・クローズアップ",
+    "cu.labelKeyboard": "鍵盤（現在音を中心に ±2 オクターブ／緑のマーカーはピッチの寄り）",
+    "cu.labelDetune": "デチューン（チューナー式メーター／単位 cent）",
+    "cu.labelVoiceParams": "音色パラメータ",
+    "lib.heading": "収録曲",
+    "lib.testSong": "合成テスト曲（動作確認用・ドレミファソラシド）",
+    "file.heading": "自分の MDX ファイルを読み込む",
+    "file.choose": "ファイルを選ぶ（.mdx / .pdx）",
+    "file.dropHint": "ここへのドラッグ＆ドロップでも読み込めます（PC の場合）。PCM を使う曲は .pdx も一緒に選んでください。",
+    "folder.heading": "フォルダ再生（順次再生）",
+    "folder.pickFolder": "MDX フォルダを選ぶ",
+    "folder.pickFiles": "ファイルをまとめて選ぶ",
+    "folder.clear": "選択をクリア",
+    "folder.dropHint": "MDX フォルダはここへの<strong>ドラッグ＆ドロップ</strong>でも読み込めます。アプリ内ブラウザのファイル選択ではフォルダが選べないため、その場合は Finder からコレクションのフォルダをここに落としてください。メーカー別フォルダを1つずつ落として追加していくこともできます。",
+    "folder.noSelection": "フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）",
+    "safety.label": "時間の保険（1曲の再生時間の上限）",
+    "safety.note": "分を超えたら次の曲へ進みます（順次再生とランダム再生のときだけ働きます）",
+    "lang.selectLabel": "表示言語（デバッグ用）",
+    "meta.withPdxLoaded": "ファイル: {name} ／ 参照 PDX: {pdx} → 読込済み: {label}",
+    "meta.withPdx": "ファイル: {name} ／ 参照 PDX: {pdx}",
+    "meta.noPdx": "ファイル: {name} ／ PDX 参照なし（FM のみ）",
+    "meta.lzxSuffix": " ／ LZX圧縮ファイルを展開しました",
+    "warn.pdxMissing": "PDX「{pdx}」が未読込のため、PCM チャンネルは無音です（FM のみ再生）。",
+    "warn.pdxMismatch": "参照名「{pdx}」とは違う名前の PDX ですが、そのまま流用して再生します。",
+    "pdx.bundled": "{name}（収録）",
+    "pdx.folderLinked": "{name}（フォルダ連携）",
+    "pdx.loadedApplied": "PDX を読み込みました: {name}（現在の曲に適用）",
+    "pdx.loadedPending": "PDX を読み込みました: {name}（次の MDX 読み込み時に使います）",
+    "ch.openAnalysis": "{ch} の解析パネルを開く",
+    "ch.openVoice": "{ch} の音色パラメータ詳細を開く",
+    "ch.muteTitle": "{ch} をミュート",
+    "ch.muteAria": "{ch} ミュート",
+    "ch.soloTitle": "{ch} をソロ",
+    "ch.soloAria": "{ch} ソロ",
+    "ch.meterTitle": "クリックでミュート切替",
+    "ch.vpTitle": "音色番号（@）とパン",
+    "ch.emptyTrack": "データなし（空トラック）",
+    "voice.titleCh": "音色パラメータ詳細 — {ch}",
+    "voice.notDefined": "{ch} の音色 @{n} は、この曲に定義されていません。",
+    "voice.currentMeta": "{ch} の現在音色 @{n}（エンジンが読み込んだ @ 定義そのもの）",
+    "voice.emptyMeta": "曲を読み込んで再生すると、そのチャンネルの現在音色のパラメータが表示されます。",
+    "an.titleCh": "チャンネル解析 — {ch}",
+    "an.emptyMeta": "曲を読み込んで再生すると、そのチャンネルのピッチ／音量トレースと LFO の状態が表示されます。",
+    "an.historyMeta": "{ch} の直近 {ticks} tick（約 {secs} 秒）の履歴です。",
+    "an.noteVal": "{note}（MIDI {n}）",
+    "an.detuneSetVal": "{cents}（生値 {raw}）",
+    "lfo.wave0": "0（ランプ）",
+    "lfo.wave1": "1（矩形／ステップ）",
+    "lfo.wave2": "2（三角）",
+    "lfo.wave3": "3（ランダム）",
+    "lfo.pitchOn": "ON ／ 波形 {wave} ／ 周期 {len} tick ／ 深さ（デルタ開始値） {delta} ／ 現在オフセット {offset}",
+    "lfo.volOn": "ON ／ 波形 {wave} ／ 周期 {len} tick ／ 深さ（デルタ開始値） {delta} ／ 現在の減衰 {offset}",
+    "lfo.delayVal": "設定 {set} tick ／ 残り {left} tick",
+    "cu.titleCh": "ソロ・クローズアップ — {ch}",
+    "cu.noteVal": "{note}\n（MIDI {n}）",
+    "cu.silent": "（無音）",
+    "cu.pcmMeta": "{ch} は PCM チャンネルです。FM 音色パラメータはありません（音色番号は PDX サンプルの番号です）。",
+    "cu.voiceMetaDefault": "{ch} の現在音色のパラメータです（エンジンが読み込んだ @ 定義そのもの）。",
+    "status.playing": "再生中: {name}",
+    "status.loaded": "読み込みました: {name}",
+    "status.paused": "一時停止中",
+    "status.stopped": "停止しました。",
+    "status.ended": "演奏が終了しました。",
+    "status.loading": "読み込み中…",
+    "status.noWebAudio": "このブラウザでは Web Audio が使えません。",
+    "status.playError": "再生エラー: {msg}",
+    "status.fmInit": "FM コア (ymfm / WASM) を初期化中…",
+    "status.fmFail": "FM コア (ymfm / WASM) の初期化に失敗しました。詳細: {detail}",
+    "status.audioInitFail": "音声出力の初期化に失敗しました。",
+    "status.audioBlocked": "音声がブラウザに止められています。画面をクリック／タップすると再生が始まります。",
+    "status.lzxFail": "LZX展開に失敗しました: {msg}",
+    "status.lzxExpandFail": "LZX の展開に失敗しました: {msg}",
+    "status.mdxFail": "MDX の読み込みに失敗しました: {msg}",
+    "status.mdxParseFail": "MDX の解析に失敗しました: {msg}",
+    "status.playingPdxMissing": "再生中: {name}（参照 PDX「{pdx}」がフォルダ内に見つからず、FM のみ再生）{modeNote}",
+    "engine.ymfmFail": "ymfm (libymfm.wasm) の初期化に失敗しました",
+    "test.name": "TEST (合成)",
+    "modeNote.random": "（連続ランダム再生中）",
+    "modeNote.seq": "（フォルダ順次再生中）",
+    "safety.limitLabel": "{v}分",
+    "safety.noteText": "（時間の保険：再生時間が設定の {limit} を超えたため、{verb}）",
+    "safety.verbTried": "次の曲へ進もうとしました",
+    "safety.verbStopped": "ここで止めました",
+    "safety.verbAdvanced": "次の曲へ進みました",
+    "seq.ended": "フォルダ順次再生を終了しました。",
+    "seq.parked": "フォルダ順次再生を停止しました（位置は保持しています）。",
+    "seq.resumed": "フォルダ順次再生を再開しました。",
+    "seq.lastEnded": "フォルダ内の最後の曲が終わりました。",
+    "seq.skippedSuffix": "（読み込めない {n} 曲を飛ばしました）",
+    "seq.stopTooManyFail": "読み込めない曲が続いたため、元の位置に戻って停止しました。",
+    "seq.stopNoneBefore": "読み込める曲が前にないため、元の位置に戻って停止しました。",
+    "seq.stopAllPlayed": "フォルダ内の曲をすべて再生しました。元の位置に戻って停止しました。",
+    "rand.modeOff": "連続ランダム再生モードを OFF にしました。",
+    "rand.pathLabel": "パス: {path}",
+    "folder.loadedInfo": "読み込み済み: {name}（MDX {mdx} 曲見つかりました ／ 索引 {idx} 件）",
+    "folder.catalogMatch": " ／ カタログの {n} 曲と一致",
+    "folder.scanning": "フォルダ「{name}」を走査中…",
+    "folder.pickFailed": "フォルダ選択に失敗しました: {msg}（フォルダを上の枠へドラッグ＆ドロップするか、「ファイルをまとめて選ぶ」を試してください）",
+    "folder.selectedFolder": "選択フォルダ",
+    "folder.loadFailed": "フォルダの読み込みに失敗しました: {msg}",
+    "folder.filesAddedLabel": "ファイル {n} 件を追加",
+    "file.loadFailed": "ファイルの読み込みに失敗しました: {msg}",
+    "folder.dropScanning": "ドロップされたフォルダを走査中…",
+    "folder.dropFailed": "ドロップからファイルを取り込めませんでした。「ファイルをまとめて選ぶ」を試してください。",
+    "folder.dndLabel": "ドラッグ＆ドロップ",
+    "folder.clearedStatus": "選択をクリアしました。フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）",
+    "folder.cleared": "選択をクリアしました。",
+    "folder.clearedNone": "選択をクリアしました（選択済みのフォルダはありませんでした）。",
+    "folder.howto": "使い方: ①コレクション（MDX ファイルの入ったフォルダ）を読み込ませます。方法は3つあり、どれか通るものを使ってください。（a）「MDX フォルダを選ぶ」でフォルダを選択（Chrome／Edge／Safari などフォルダ選択に対応したブラウザ向け）、（b）フォルダを上の枠へドラッグ＆ドロップ（アプリ内ブラウザ向け。メーカー別フォルダを1つずつ追加も可）、（c）「ファイルをまとめて選ぶ」でファイル単位で複数選択（選ぶたびに索引へ追加されます。フォルダ内を開いて全選択すると、そのフォルダ分がまとめて入ります）→ ②読み込むと、フォルダ内（サブフォルダ含む）の MDX を相対パスの順に並べ、先頭から順に再生します。曲が終わると次の曲へ進み（ループ曲は1周したら次へ）、最後の曲が終わると停止します。参照 PDX があれば同じフォルダから自動で読み込みます。プレイヤーの「前の曲」／「次の曲」ボタンで前後の曲へ移動でき、その横の「n / N」とパスが一覧の中での位置です。フォルダの取り込みは追加方式で、選ぶたびに索引へ足されていきます。入れ替えたいときは「選択をクリア」を押してください。索引と順次再生の位置が消えて初回の状態に戻り、フォルダ由来の曲が読み込まれていれば止まってプレイヤーから下ろされます（手動で読み込んだ曲や収録曲はそのまま鳴り続けます）。Mac のデスクトップ前提です。",
+    "about.1": "MDX と音源チップについて",
+    "about.2": "<b>MDX / MXDRV</b> — X68000（シャープ, 1987）で広く使われた音楽ドライバ MXDRV の演奏データ形式。MML（Music Macro Language）をコンパイルしたもので、タイトル、FM 音色データ、9〜16 トラック分の演奏データを含む。データは 68000 のビッグエンディアンで格納されている。",
+    "about.3": "<b>YM2151 (OPM)</b> — X68000 内蔵の FM 音源チップ。4 オペレータ×8 チャンネル、8 アルゴリズム、フィードバック、AM/PM 対応のハードウェア LFO を備え、アーケード基板でも多用された。X68000 では 4 MHz で駆動され、ネイティブの生成レートは 62.5 kHz。本ページでは、現在の MAME が採用する ymfm そのものを WebAssembly（libymfm.wasm）として埋め込み、レジスタ駆動で鳴らしている。",
+    "about.4": "<b>MSM6258</b> — X68000 内蔵の ADPCM 音源。4bit ADPCM サンプルを PDX ファイルから読み、ドラムや効果音を 1 チャンネル（PCM8 モードでは多重再生）で鳴らす。X68000 ではクロック 4 MHz、サンプリング周波数は 3.9k〜15.6kHz。",
+    "calib.song": "曲",
+    "calib.refRms": "参照 RMS",
+    "calib.oldRms": "旧 RMS",
+    "calib.newRms": "新 RMS",
+    "calib.refCentroid": "参照 重心",
+    "calib.oldCentroid": "旧 重心",
+    "calib.newCentroid": "新 重心",
+    "calib.preRms": "較正前 RMS",
+    "calib.postRms": "較正後 RMS",
+    "calib.refPeak": "参照 ピーク",
+    "calib.postPeak": "較正後 ピーク",
+  },
+  "en": {
+    "doc.title": "MDX Player",
+    "aria.channels": "Channel status",
+    "aria.player": "Player",
+    "aria.spectrum": "Spectrum analyzer",
+    "aria.voicePanel": "Voice parameter details",
+    "aria.analysisPanel": "Channel analysis",
+    "aria.anChSel": "Channel to analyze",
+    "aria.closeup": "Solo close-up",
+    "aria.cuClose": "Close the close-up",
+    "aria.library": "Included songs",
+    "aria.fileLoad": "File loading",
+    "aria.folderPanel": "Folder and sequential playback",
+    "aria.notes": "Notes",
+    "aria.refs": "Rebuild based on reference implementations",
+    "aria.about": "About",
+    "aria.seqPos": "Playback position within the folder",
+    "aria.progress": "Playback position (one pass of the song)",
+    "ch.heading": "Channels",
+    "ch.msClear": "Clear all mute / solo",
+    "ch.helpSummary": "How to operate (M / S, @n, pan, analysis panel)",
+    "ch.help": "M in each row = mute, S = solo. While any solo is ON, everything but the solos is silent, and mute wins (mute + solo is silent). Clicking the level meter also toggles mute. Loading a different song resets everything. The “@n” in each row is the current voice number (for PCM, the number of the PDX sample last sounded), and the letter beside it is the pan (L / C / R, “—” when off). An FM row’s “@n” can be clicked to open that voice’s parameter detail panel. Clicking a channel name (such as FM 1) opens the analysis panel, where that channel’s pitch / volume traces and LFO state can be seen.",
+    "player.noSong": "No song selected",
+    "player.noSongHint": "Choose a test song from “Verification” below, or load an .mdx file.",
+    "btn.play": "▶ Play",
+    "btn.pause": "❚❚ Pause",
+    "btn.stop": "■ Stop",
+    "btn.loopOn": "Loop ON",
+    "btn.loopOff": "Loop OFF",
+    "btn.prevSong": "Previous song",
+    "btn.nextSong": "Next song",
+    "btn.close": "Close",
+    "btn.closeX": "× Close",
+    "btn.tempoReset": "Back to 100%",
+    "label.volume": "Master volume",
+    "label.tempo": "Tempo",
+    "spec.heading": "Spectrum",
+    "spec.note": "Master output / Log axis / 96 bands",
+    "voice.heading": "Voice parameter details",
+    "voice.metaDefault": "Click an FM channel’s “@n” and that voice’s parameters are shown here.",
+    "voice.footnote": "Operators are shown in signal order (M1 / M2 / C1 / C2). The values are the voice data the engine actually loaded (MXDRV’s @ definitions) reported as-is, and they follow automatically when the voice changes during playback. TL is the value in the voice definition (a carrier’s actual TL changes with volume).",
+    "stat.channel": "Channel",
+    "stat.voiceNum": "Voice no.",
+    "stat.alg": "ALG (algorithm)",
+    "stat.fb": "FB (feedback)",
+    "stat.pan": "Pan",
+    "stat.curNote": "Current note",
+    "stat.nominalNote": "Nominal note",
+    "stat.effPitch": "Effective pitch (MIDI)",
+    "stat.detuneSet": "Detune setting (F3)",
+    "stat.portamento": "Portamento (F2)",
+    "stat.pitchLfo": "Pitch LFO (EC)",
+    "stat.volLfo": "Volume LFO (EB)",
+    "stat.lfoDelay": "LFO delay (E9)",
+    "voice.thParam": "Parameter",
+    "an.heading": "Channel analysis",
+    "an.targetLabel": "Target",
+    "an.metaDefault": "Click a channel name (such as FM 1) and that channel’s pitch and volume trajectories are shown here.",
+    "an.labelDetune": "Detune (tuner-style meter / in cents, compressed scale magnifying the centre area)",
+    "an.labelVu": "Effective volume (VU-style meter / 0 VU is referenced to level 0.70)",
+    "an.labelPitchTrace": "Pitch trace (horizontal lines = semitone grid, dashed = nominal note)",
+    "an.labelVolTrace": "Volume trace",
+    "an.footnote": "The traces are the recent history the engine recorded per tick (up to 640 ticks). The pitch is a conversion of the final pitch actually written to the chip, so detune, portamento and pitch-LFO movement appear as they are. Of the readings, detune and effective volume are shown on needle meters (detune is tuner-style: with vibrato the needle swings left and right, with detune it stays leaning to one position; volume is VU-style, and because the needle has VU’s native ballistics, with tremolo the needle pumps). Volume is the same effective level as the level meters. Parameters such as the LFOs stay numeric, and are the settings / current values themselves that the engine holds.",
+    "detail.emptyHint": "An FM row’s “@n” opens the voice parameter details, and a channel name opens the channel analysis, here.",
+    "cu.heading": "Solo close-up",
+    "cu.labelKeyboard": "Keyboard (±2 octaves around the current note / the green marker is the pitch position)",
+    "cu.labelDetune": "Detune (tuner-style meter / in cents)",
+    "cu.labelVoiceParams": "Voice parameters",
+    "lib.heading": "Included songs",
+    "lib.testSong": "Synthetic test song (for checking operation — do re mi fa sol la ti do)",
+    "file.heading": "Load your own MDX files",
+    "file.choose": "Choose files (.mdx / .pdx)",
+    "file.dropHint": "You can also load by dragging & dropping here (on a PC). For songs that use PCM, select the .pdx together with them.",
+    "folder.heading": "Folder playback (sequential playback)",
+    "folder.pickFolder": "Choose an MDX folder",
+    "folder.pickFiles": "Choose files in bulk",
+    "folder.clear": "Clear selection",
+    "folder.dropHint": "An MDX folder can also be loaded by <strong>drag & drop</strong> here. In in-app browsers, whose file selection cannot choose folders, drop the collection’s folder here from Finder instead. Folders per maker can also be dropped one at a time to add them.",
+    "folder.noSelection": "No folder selected (sequential playback needs a folder selection, drag & drop, or a multi-file selection)",
+    "safety.label": "Time safety (per-song playback time limit)",
+    "safety.note": "min — past this, advance to the next song (works only during sequential and random playback)",
+    "lang.selectLabel": "Display language (debug)",
+    "meta.withPdxLoaded": "File: {name} / Referenced PDX: {pdx} → Loaded: {label}",
+    "meta.withPdx": "File: {name} / Referenced PDX: {pdx}",
+    "meta.noPdx": "File: {name} / No PDX reference (FM only)",
+    "meta.lzxSuffix": " / LZX-compressed file expanded",
+    "warn.pdxMissing": "PDX “{pdx}” is not loaded, so the PCM channels are silent (FM only).",
+    "warn.pdxMismatch": "This PDX has a different name than the referenced name “{pdx}”, but it is used as-is for playback.",
+    "pdx.bundled": "{name} (included)",
+    "pdx.folderLinked": "{name} (folder-linked)",
+    "pdx.loadedApplied": "PDX loaded: {name} (applied to the current song)",
+    "pdx.loadedPending": "PDX loaded: {name} (used at the next MDX load)",
+    "ch.openAnalysis": "Open the analysis panel for {ch}",
+    "ch.openVoice": "Open the voice parameter details for {ch}",
+    "ch.muteTitle": "Mute {ch}",
+    "ch.muteAria": "{ch} mute",
+    "ch.soloTitle": "Solo {ch}",
+    "ch.soloAria": "{ch} solo",
+    "ch.meterTitle": "Click to toggle mute",
+    "ch.vpTitle": "Voice number (@) and pan",
+    "ch.emptyTrack": "No data (empty track)",
+    "voice.titleCh": "Voice parameter details — {ch}",
+    "voice.notDefined": "{ch} voice @{n} is not defined in this song.",
+    "voice.currentMeta": "{ch} current voice @{n} (the very @ definition the engine loaded)",
+    "voice.emptyMeta": "Load a song and play it, and that channel’s current voice parameters are shown.",
+    "an.titleCh": "Channel analysis — {ch}",
+    "an.emptyMeta": "Load a song and play it, and that channel’s pitch / volume traces and LFO state are shown.",
+    "an.historyMeta": "History of {ch}: the most recent {ticks} ticks (about {secs} seconds).",
+    "an.noteVal": "{note} (MIDI {n})",
+    "an.detuneSetVal": "{cents} (raw value {raw})",
+    "lfo.wave0": "0 (ramp)",
+    "lfo.wave1": "1 (square / step)",
+    "lfo.wave2": "2 (triangle)",
+    "lfo.wave3": "3 (random)",
+    "lfo.pitchOn": "ON / Waveform {wave} / Period {len} ticks / Depth (delta start) {delta} / Current offset {offset}",
+    "lfo.volOn": "ON / Waveform {wave} / Period {len} ticks / Depth (delta start) {delta} / Current attenuation {offset}",
+    "lfo.delayVal": "Set {set} ticks / Remaining {left} ticks",
+    "cu.titleCh": "Solo close-up — {ch}",
+    "cu.noteVal": "{note}\n(MIDI {n})",
+    "cu.silent": "(silent)",
+    "cu.pcmMeta": "{ch} is a PCM channel. There are no FM voice parameters (the voice number is the PDX sample number).",
+    "cu.voiceMetaDefault": "The parameters of {ch} current voice (the very @ definition the engine loaded).",
+    "status.playing": "Playing: {name}",
+    "status.loaded": "Loaded: {name}",
+    "status.paused": "Paused",
+    "status.stopped": "Stopped.",
+    "status.ended": "Playback finished.",
+    "status.loading": "Loading…",
+    "status.noWebAudio": "Web Audio is not available in this browser.",
+    "status.playError": "Playback error: {msg}",
+    "status.fmInit": "Initializing the FM core (ymfm / WASM)…",
+    "status.fmFail": "FM core (ymfm / WASM) failed to initialize. Details: {detail}",
+    "status.audioInitFail": "Audio output initialization failed.",
+    "status.audioBlocked": "Audio is being held back by the browser. Click / tap the screen and playback will start.",
+    "status.lzxFail": "LZX expansion failed: {msg}",
+    "status.lzxExpandFail": "LZX expansion failed: {msg}",
+    "status.mdxFail": "MDX loading failed: {msg}",
+    "status.mdxParseFail": "MDX parsing failed: {msg}",
+    "status.playingPdxMissing": "Playing: {name} (referenced PDX “{pdx}” not found in the folder; FM only){modeNote}",
+    "engine.ymfmFail": "ymfm (libymfm.wasm) failed to initialize",
+    "test.name": "TEST (synthetic)",
+    "modeNote.random": " (continuous random playback)",
+    "modeNote.seq": " (folder sequential playback)",
+    "safety.limitLabel": "{v} min",
+    "safety.noteText": " (Time safety: the playback time exceeded the setting of {limit}, so {verb})",
+    "safety.verbTried": "it tried to advance to the next song",
+    "safety.verbStopped": "it stopped here",
+    "safety.verbAdvanced": "it advanced to the next song",
+    "seq.ended": "Folder sequential playback ended.",
+    "seq.parked": "Folder sequential playback stopped (the position is kept).",
+    "seq.resumed": "Folder sequential playback resumed.",
+    "seq.lastEnded": "The last song in the folder finished.",
+    "seq.skippedSuffix": " (Skipped unreadable songs: {n})",
+    "seq.stopTooManyFail": "Unreadable songs kept coming up, so playback returned to the original position and stopped.",
+    "seq.stopNoneBefore": "No readable song before, so playback returned to the original position and stopped.",
+    "seq.stopAllPlayed": "All songs in the folder were played. Playback returned to the original position and stopped.",
+    "rand.modeOff": "Continuous random playback mode turned OFF.",
+    "rand.pathLabel": "Path: {path}",
+    "folder.loadedInfo": "Loaded: {name} (MDX songs found: {mdx} / Index entries: {idx})",
+    "folder.catalogMatch": " / Catalog matches: {n}",
+    "folder.scanning": "Scanning the folder “{name}”…",
+    "folder.pickFailed": "Folder selection failed: {msg} (drag & drop the folder onto the frame above, or try “Choose files in bulk”)",
+    "folder.selectedFolder": "Selected folder",
+    "folder.loadFailed": "Folder loading failed: {msg}",
+    "folder.filesAddedLabel": "Added files: {n}",
+    "file.loadFailed": "File loading failed: {msg}",
+    "folder.dropScanning": "Scanning the dropped folder…",
+    "folder.dropFailed": "Could not take in files from the drop. Try “Choose files in bulk”.",
+    "folder.dndLabel": "Drag & drop",
+    "folder.clearedStatus": "Selection cleared. No folder selected (sequential playback needs a folder selection, drag & drop, or a multi-file selection)",
+    "folder.cleared": "Selection cleared.",
+    "folder.clearedNone": "Selection cleared (there was no selected folder).",
+    "folder.howto": "How to use: ① Load a collection (a folder containing MDX files). There are three methods; use whichever works. (a) Select a folder with “Choose an MDX folder” (for browsers with folder selection, such as Chrome / Edge / Safari), (b) drag & drop the folder onto the frame above (for in-app browsers; folders per maker can also be added one at a time), (c) select multiple files individually with “Choose files in bulk” (each pick is added to the index; opening a folder and selecting all puts that folder’s worth in at once) → ② When loaded, the MDXs in the folder (subfolders included) are lined up in relative-path order and played in order from the head. When a song ends it advances to the next song (a looping song advances after one lap), and when the last song ends it stops. If there is a referenced PDX it is loaded automatically from the same folder. The player’s “Previous song” / “Next song” buttons move to the songs before and after, and the “n / N” and path beside them are the position within the list. Folder intake is additive: each pick is added to the index. To replace it, press “Clear selection”. The index and the sequential playback position disappear, returning to the first-run state, and if a folder-derived song is loaded it stops and is unloaded from the player (manually loaded songs and included songs keep sounding as they are). Assumes a Mac desktop.",
+    "about.1": "About MDX and the sound chips",
+    "about.2": "<b>MDX / MXDRV</b> — the performance data format of MXDRV, the music driver widely used on the X68000 (Sharp, 1987). Compiled from MML (Music Macro Language), it contains a title, FM voice data, and performance data for 9–16 tracks. The data is stored in 68000 big-endian.",
+    "about.3": "<b>YM2151 (OPM)</b> — the FM sound chip built into the X68000. 4 operators × 8 channels, 8 algorithms, feedback, and a hardware LFO with AM/PM support; also widely used on arcade boards. On the X68000 it is driven at 4 MHz and its native generation rate is 62.5 kHz. On this page, ymfm itself — the core adopted by current MAME — is embedded as WebAssembly (libymfm.wasm) and sounded by register driving.",
+    "about.4": "<b>MSM6258</b> — the ADPCM sound source built into the X68000. It reads 4-bit ADPCM samples from PDX files and sounds drums and effects on 1 channel (multiplex playback in PCM8 mode). On the X68000 the clock is 4 MHz and the sampling frequency is 3.9k–15.6kHz.",
+    "calib.song": "Song",
+    "calib.refRms": "Ref. RMS",
+    "calib.oldRms": "Old RMS",
+    "calib.newRms": "New RMS",
+    "calib.refCentroid": "Ref. centroid",
+    "calib.oldCentroid": "Old centroid",
+    "calib.newCentroid": "New centroid",
+    "calib.preRms": "Pre-cal. RMS",
+    "calib.postRms": "Post-cal. RMS",
+    "calib.refPeak": "Ref. peak",
+    "calib.postPeak": "Post-cal. peak",
+  },
+  "sv": {
+    "doc.title": "MDX-spelare",
+    "aria.channels": "Kanalstatus",
+    "aria.player": "Spelare",
+    "aria.spectrum": "Spektrumanalysator",
+    "aria.voicePanel": "Ljudparameterdetaljer",
+    "aria.analysisPanel": "Kanalanalys",
+    "aria.anChSel": "Kanal att analysera",
+    "aria.closeup": "Solo-närbild",
+    "aria.cuClose": "Stäng närbilden",
+    "aria.library": "Medföljande låtar",
+    "aria.fileLoad": "Filinläsning",
+    "aria.folderPanel": "Mapp och sekventiell uppspelning",
+    "aria.notes": "Noter",
+    "aria.refs": "Ombyggnad baserad på referensimplementationer",
+    "aria.about": "Om",
+    "aria.seqPos": "Uppspelningsposition inom mappen",
+    "aria.progress": "Uppspelningsposition (en genomspelning av låten)",
+    "ch.heading": "Kanaler",
+    "ch.msClear": "Rensa all mute / solo",
+    "ch.helpSummary": "Användning (M / S, @n, panorering, analyspanel)",
+    "ch.help": "M i varje rad = mute, S = solo. Medan något solo är PÅ är allt utom solona tyst, och mute vinner (mute + solo är tyst). Ett klick på nivåmätaren växlar också mute. Inläsning av en annan låt återställer allt. ”@n” i varje rad är det aktuella ljudnumret (för PCM, numret på det PDX-sampel som senast ljöd), och bokstaven bredvid är panoreringen (L / C / R, ”—” när av). En FM-rads ”@n” kan klickas för att öppna det ljudets parameterdetaljpanel. Ett klick på ett kanalnamn (som FM 1) öppnar analyspanelen, där kanalens tonhöjds-/volymspår och LFO-tillstånd kan ses.",
+    "player.noSong": "Ingen låt vald",
+    "player.noSongHint": "Välj en testlåt från ”Verifiering” nedan, eller läs in en .mdx-fil.",
+    "btn.play": "▶ Spela",
+    "btn.pause": "❚❚ Paus",
+    "btn.stop": "■ Stopp",
+    "btn.loopOn": "Loop PÅ",
+    "btn.loopOff": "Loop AV",
+    "btn.prevSong": "Föregående låt",
+    "btn.nextSong": "Nästa låt",
+    "btn.close": "Stäng",
+    "btn.closeX": "× Stäng",
+    "btn.tempoReset": "Tillbaka till 100 %",
+    "label.volume": "Huvudvolym",
+    "label.tempo": "Tempo",
+    "spec.heading": "Spektrum",
+    "spec.note": "Huvudutgång / Logaxel / 96 band",
+    "voice.heading": "Ljudparameterdetaljer",
+    "voice.metaDefault": "Klicka på en FM-kanals ”@n” så visas det ljudets parametrar här.",
+    "voice.footnote": "Operatorerna visas i signalordning (M1 / M2 / C1 / C2). Värdena är de ljuddata motorn faktiskt läste in (MXDRV:s @-definitioner) rapporterade som de är, och de följer automatiskt med när ljudet byts under uppspelning. TL är värdet i ljuddefinitionen (en bärares faktiska TL ändras med volymen).",
+    "stat.channel": "Kanal",
+    "stat.voiceNum": "Ljudnr",
+    "stat.alg": "ALG (algoritm)",
+    "stat.fb": "FB (feedback)",
+    "stat.pan": "Panorering",
+    "stat.curNote": "Aktuell not",
+    "stat.nominalNote": "Nominell not",
+    "stat.effPitch": "Effektiv tonhöjd (MIDI)",
+    "stat.detuneSet": "Detune-inställning (F3)",
+    "stat.portamento": "Portamento (F2)",
+    "stat.pitchLfo": "Pitch-LFO (EC)",
+    "stat.volLfo": "Volym-LFO (EB)",
+    "stat.lfoDelay": "LFO-fördröjning (E9)",
+    "voice.thParam": "Parameter",
+    "an.heading": "Kanalanalys",
+    "an.targetLabel": "Mål",
+    "an.metaDefault": "Klicka på ett kanalnamn (som FM 1) så visas kanalens tonhöjds- och volymförlopp här.",
+    "an.labelDetune": "Detune (nålmätare i tunerstil / i cent, komprimerad skala som förstorar centrumområdet)",
+    "an.labelVu": "Effektiv volym (nålmätare i VU-stil / 0 VU refereras till nivå 0,70)",
+    "an.labelPitchTrace": "Tonhöjdsspår (horisontella linjer = halvtonsrutnät, streckad = nominell not)",
+    "an.labelVolTrace": "Volymspår",
+    "an.footnote": "Spåren är den senaste historiken som motorn spelade in per tick (upp till 640 tick). Tonhöjden är en omvandling av den slutliga tonhöjd som faktiskt skrevs till chippet, så detune, portamento och pitch-LFO-rörelser syns som de är. Av avläsningarna visas detune och effektiv volym på nålmätare (detune är i tunerstil: med vibrato svänger nålen åt vänster och höger, med detune stannar den lutad åt ett håll; volymen är i VU-stil, och eftersom nålen har VU:s ursprungliga ballistik pumpar nålen vid tremolo). Volymen är samma effektiva nivå som nivåmätarnas. Parametrar som LFO:erna förblir numeriska och är själva de inställningar/aktuella värden som motorn håller.",
+    "detail.emptyHint": "En FM-rads ”@n” öppnar ljudparameterdetaljerna, och ett kanalnamn öppnar kanalanalysen, här.",
+    "cu.heading": "Solo-närbild",
+    "cu.labelKeyboard": "Klaviatur (±2 oktaver runt den aktuella noten / den gröna markören är tonhöjdspositionen)",
+    "cu.labelDetune": "Detune (nålmätare i tunerstil / i cent)",
+    "cu.labelVoiceParams": "Ljudparametrar",
+    "lib.heading": "Medföljande låtar",
+    "lib.testSong": "Syntetisk testlåt (för funktionskontroll — do re mi fa sol la ti do)",
+    "file.heading": "Läs in dina egna MDX-filer",
+    "file.choose": "Välj filer (.mdx / .pdx)",
+    "file.dropHint": "Du kan också läsa in genom att dra och släppa här (på en PC). För låtar som använder PCM, välj .pdx tillsammans med dem.",
+    "folder.heading": "Mappuppspelning (sekventiell uppspelning)",
+    "folder.pickFolder": "Välj en MDX-mapp",
+    "folder.pickFiles": "Välj filer i bulk",
+    "folder.clear": "Rensa urval",
+    "folder.dropHint": "En MDX-mapp kan också läsas in genom <strong>dra och släpp</strong> här. I webbläsare i appar, vars filval inte kan välja mappar, släpp i stället samlingens mapp här från Finder. Mappar per tillverkare kan också släppas en i taget för att lägga till dem.",
+    "folder.noSelection": "Ingen mapp vald (sekventiell uppspelning kräver ett mappval, dra och släpp, eller ett flerval av filer)",
+    "safety.label": "Tidssäkerhet (uppspelningstidsgräns per låt)",
+    "safety.note": "min — förbi detta, gå vidare till nästa låt (fungerar bara under sekventiell och slumpmässig uppspelning)",
+    "lang.selectLabel": "Visningsspråk (felsökning)",
+    "meta.withPdxLoaded": "Fil: {name} / Refererad PDX: {pdx} → Inläst: {label}",
+    "meta.withPdx": "Fil: {name} / Refererad PDX: {pdx}",
+    "meta.noPdx": "Fil: {name} / Ingen PDX-referens (endast FM)",
+    "meta.lzxSuffix": " / LZX-komprimerad fil expanderad",
+    "warn.pdxMissing": "PDX ”{pdx}” är inte inläst, så PCM-kanalerna är tysta (endast FM).",
+    "warn.pdxMismatch": "Den här PDX:en har ett annat namn än det refererade namnet ”{pdx}”, men den används som den är för uppspelning.",
+    "pdx.bundled": "{name} (medföljande)",
+    "pdx.folderLinked": "{name} (mappkopplad)",
+    "pdx.loadedApplied": "PDX inläst: {name} (tillämpad på den aktuella låten)",
+    "pdx.loadedPending": "PDX inläst: {name} (används vid nästa MDX-inläsning)",
+    "ch.openAnalysis": "Öppna analyspanelen för {ch}",
+    "ch.openVoice": "Öppna ljudparameterdetaljerna för {ch}",
+    "ch.muteTitle": "Muta {ch}",
+    "ch.muteAria": "{ch} mute",
+    "ch.soloTitle": "Solo {ch}",
+    "ch.soloAria": "{ch} solo",
+    "ch.meterTitle": "Klicka för att växla mute",
+    "ch.vpTitle": "Ljudnummer (@) och panorering",
+    "ch.emptyTrack": "Inga data (tomt spår)",
+    "voice.titleCh": "Ljudparameterdetaljer — {ch}",
+    "voice.notDefined": "{ch} ljud @{n} är inte definierat i den här låten.",
+    "voice.currentMeta": "{ch} aktuella ljud @{n} (själva @-definitionen som motorn läste in)",
+    "voice.emptyMeta": "Läs in en låt och spela den, så visas kanalens aktuella ljudparametrar.",
+    "an.titleCh": "Kanalanalys — {ch}",
+    "an.emptyMeta": "Läs in en låt och spela den, så visas kanalens tonhöjds-/volymspår och LFO-tillstånd.",
+    "an.historyMeta": "Historik för {ch}: de senaste {ticks} ticken (omkring {secs} sekunder).",
+    "an.noteVal": "{note} (MIDI {n})",
+    "an.detuneSetVal": "{cents} (råvärde {raw})",
+    "lfo.wave0": "0 (ramp)",
+    "lfo.wave1": "1 (fyrkant / steg)",
+    "lfo.wave2": "2 (triangel)",
+    "lfo.wave3": "3 (slump)",
+    "lfo.pitchOn": "PÅ / Vågform {wave} / Period {len} tick / Djup (delta-start) {delta} / Aktuell offset {offset}",
+    "lfo.volOn": "PÅ / Vågform {wave} / Period {len} tick / Djup (delta-start) {delta} / Aktuell dämpning {offset}",
+    "lfo.delayVal": "Inställt {set} tick / Återstår {left} tick",
+    "cu.titleCh": "Solo-närbild — {ch}",
+    "cu.noteVal": "{note}\n(MIDI {n})",
+    "cu.silent": "(tyst)",
+    "cu.pcmMeta": "{ch} är en PCM-kanal. Det finns inga FM-ljudparametrar (ljudnumret är PDX-sampelnumret).",
+    "cu.voiceMetaDefault": "Parametrarna för {ch} aktuella ljud (själva @-definitionen som motorn läste in).",
+    "status.playing": "Spelar: {name}",
+    "status.loaded": "Inläst: {name}",
+    "status.paused": "Pausad",
+    "status.stopped": "Stoppad.",
+    "status.ended": "Uppspelningen avslutad.",
+    "status.loading": "Läser in…",
+    "status.noWebAudio": "Web Audio är inte tillgängligt i den här webbläsaren.",
+    "status.playError": "Uppspelningsfel: {msg}",
+    "status.fmInit": "Initierar FM-kärnan (ymfm / WASM)…",
+    "status.fmFail": "FM-kärnan (ymfm / WASM) kunde inte initieras. Detaljer: {detail}",
+    "status.audioInitFail": "Ljudutgångens initiering misslyckades.",
+    "status.audioBlocked": "Ljudet hålls tillbaka av webbläsaren. Klicka / tryck på skärmen så börjar uppspelningen.",
+    "status.lzxFail": "LZX-expansion misslyckades: {msg}",
+    "status.lzxExpandFail": "LZX-expansion misslyckades: {msg}",
+    "status.mdxFail": "MDX-inläsning misslyckades: {msg}",
+    "status.mdxParseFail": "MDX-parsning misslyckades: {msg}",
+    "status.playingPdxMissing": "Spelar: {name} (refererad PDX ”{pdx}” hittades inte i mappen; endast FM){modeNote}",
+    "engine.ymfmFail": "ymfm (libymfm.wasm) kunde inte initieras",
+    "test.name": "TEST (syntetisk)",
+    "modeNote.random": " (kontinuerlig slumpmässig uppspelning)",
+    "modeNote.seq": " (sekventiell mappuppspelning)",
+    "safety.limitLabel": "{v} min",
+    "safety.noteText": " (Tidssäkerhet: uppspelningstiden överskred inställningen {limit}, så {verb})",
+    "safety.verbTried": "den försökte gå vidare till nästa låt",
+    "safety.verbStopped": "den stannade här",
+    "safety.verbAdvanced": "den gick vidare till nästa låt",
+    "seq.ended": "Sekventiell mappuppspelning avslutad.",
+    "seq.parked": "Sekventiell mappuppspelning stoppad (positionen behålls).",
+    "seq.resumed": "Sekventiell mappuppspelning återupptagen.",
+    "seq.lastEnded": "Den sista låten i mappen avslutades.",
+    "seq.skippedSuffix": " (Överhoppade oläsliga låtar: {n})",
+    "seq.stopTooManyFail": "Oläsliga låtar fortsatte att komma, så uppspelningen återvände till den ursprungliga positionen och stannade.",
+    "seq.stopNoneBefore": "Ingen läsbar låt före, så uppspelningen återvände till den ursprungliga positionen och stannade.",
+    "seq.stopAllPlayed": "Alla låtar i mappen spelades. Uppspelningen återvände till den ursprungliga positionen och stannade.",
+    "rand.modeOff": "Kontinuerligt slumpmässigt uppspelningsläge AV.",
+    "rand.pathLabel": "Sökväg: {path}",
+    "folder.loadedInfo": "Inläst: {name} (MDX-låtar hittade: {mdx} / Indexposter: {idx})",
+    "folder.catalogMatch": " / Katalogträffar: {n}",
+    "folder.scanning": "Skannar mappen ”{name}”…",
+    "folder.pickFailed": "Mappval misslyckades: {msg} (dra och släpp mappen på ramen ovan, eller pröva ”Välj filer i bulk”)",
+    "folder.selectedFolder": "Vald mapp",
+    "folder.loadFailed": "Mappinläsning misslyckades: {msg}",
+    "folder.filesAddedLabel": "Tillagda filer: {n}",
+    "file.loadFailed": "Filinläsning misslyckades: {msg}",
+    "folder.dropScanning": "Skannar den släppta mappen…",
+    "folder.dropFailed": "Kunde inte ta in filer från släppet. Pröva ”Välj filer i bulk”.",
+    "folder.dndLabel": "Dra och släpp",
+    "folder.clearedStatus": "Urval rensat. Ingen mapp vald (sekventiell uppspelning kräver ett mappval, dra och släpp, eller ett flerval av filer)",
+    "folder.cleared": "Urval rensat.",
+    "folder.clearedNone": "Urval rensat (det fanns ingen vald mapp).",
+    "folder.howto": "Användning: ① Läs in en samling (en mapp som innehåller MDX-filer). Det finns tre metoder; använd den som fungerar. (a) Välj en mapp med ”Välj en MDX-mapp” (för webbläsare med mappval, som Chrome / Edge / Safari), (b) dra och släpp mappen på ramen ovan (för webbläsare i appar; mappar per tillverkare kan också läggas till en i taget), (c) välj flera filer individuellt med ”Välj filer i bulk” (varje val läggs till i indexet; att öppna en mapp och välja allt lägger in den mappens värde på en gång) → ② Vid inläsning radas MDX:erna i mappen (undermappar inkluderade) upp i relativ sökvägsordning och spelas i ordning från början. När en låt tar slut går den vidare till nästa låt (en loopande låt går vidare efter ett varv), och när den sista låten tar slut stannar den. Om det finns en refererad PDX läses den in automatiskt från samma mapp. Spelarens knappar ”Föregående låt” / ”Nästa låt” flyttar till låtarna före och efter, och ”n / N” och sökvägen bredvid dem är positionen inom listan. Mappintaget är additivt: varje val läggs till i indexet. För att ersätta det, tryck på ”Rensa urval”. Indexet och den sekventiella uppspelningspositionen försvinner och återgår till förstagångstillståndet, och om en mapp-härledd låt är inläst stannar den och avlastas från spelaren (manuellt inlästa låtar och medföljande låtar fortsätter att ljuda som de är). Förutsätter en Mac på skrivbordet.",
+    "about.1": "Om MDX och ljudchippen",
+    "about.2": "<b>MDX / MXDRV</b> — framförandedataformatet för MXDRV, musikdrivrutinen som användes i stor utsträckning på X68000 (Sharp, 1987). Kompilerad från MML (Music Macro Language) innehåller den en titel, FM-ljuddata och framförandedata för 9–16 spår. Datan lagras i 68000 big-endian.",
+    "about.3": "<b>YM2151 (OPM)</b> — FM-ljudchippet inbyggt i X68000. 4 operatorer × 8 kanaler, 8 algoritmer, feedback och en hårdvaru-LFO med AM/PM-stöd; också flitigt använt på arkadkort. På X68000 drivs det på 4 MHz och dess ursprungliga genereringshastighet är 62,5 kHz. På den här sidan är ymfm själv — kärnan som används av nuvarande MAME — inbäddad som WebAssembly (libymfm.wasm) och ljuds genom registerdrivning.",
+    "about.4": "<b>MSM6258</b> — ADPCM-ljudkällan inbyggd i X68000. Den läser 4-bitars ADPCM-sampel från PDX-filer och ljuder trummor och effekter på 1 kanal (multiplexuppspelning i PCM8-läge). På X68000 är klockan 4 MHz och samplingsfrekvensen är 3,9k–15,6kHz.",
+    "calib.song": "Låt",
+    "calib.refRms": "Ref. RMS",
+    "calib.oldRms": "Gammal RMS",
+    "calib.newRms": "Ny RMS",
+    "calib.refCentroid": "Ref. centroid",
+    "calib.oldCentroid": "Gammal centroid",
+    "calib.newCentroid": "Ny centroid",
+    "calib.preRms": "RMS före kal.",
+    "calib.postRms": "RMS efter kal.",
+    "calib.refPeak": "Ref. topp",
+    "calib.postPeak": "Topp efter kal.",
+  }
+};
+      const I18N_LOCALES = { ja: 'ja-JP', en: 'en-US', sv: 'sv-SE' };
+      let i18nLang = 'en';
+      let i18nOverride = null;
+      function i18nDetect(languages) {
+        if (languages) {
+          for (let i = 0; i < languages.length; i++) {
+            const p = String(languages[i] || '').toLowerCase().split('-')[0];
+            if (p === 'ja' || p === 'sv' || p === 'en') return p;
+          }
+        }
+        return 'en';
+      }
+      function i18nParamLang() {
+        try {
+          const v = new URLSearchParams(location.search || '').get('lang');
+          if (v === 'ja' || v === 'en' || v === 'sv') return v;
+        } catch (e) { /* ignore */ }
+        return null;
+      }
+      function i18nResolve() {
+        return i18nOverride || i18nParamLang() ||
+          i18nDetect(navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]);
+      }
+      function tr(key, params) {
+        let s = I18N[i18nLang] ? I18N[i18nLang][key] : undefined;
+        if (s == null) s = I18N.en[key];
+        if (s == null) s = I18N.ja[key];
+        if (s == null) return key;
+        if (params) {
+          s = s.replace(/\{([a-zA-Z]+)\}/g, function (m, n) {
+            return params[n] != null ? String(params[n]) : m;
+          });
+        }
+        return s;
+      }
+      function fmtNum(n) {
+        return Number(n).toLocaleString(I18N_LOCALES[i18nLang] || 'en-US');
+      }
+      function i18nValues(key) { return [I18N.ja[key], I18N.en[key], I18N.sv[key]]; }
+      function applyI18n() {
+        i18nLang = i18nResolve();
+        document.documentElement.lang = i18nLang;
+        document.title = tr('doc.title');
+        const texts = document.querySelectorAll('[data-i18n]');
+        for (let i = 0; i < texts.length; i++) {
+          const el = texts[i];
+          const key = el.getAttribute('data-i18n');
+          if (el.hasAttribute('data-i18n-force') || i18nValues(key).indexOf(el.textContent) >= 0) {
+            el.textContent = tr(key);
+          }
+        }
+        const htmls = document.querySelectorAll('[data-i18n-html]');
+        for (let i = 0; i < htmls.length; i++) {
+          htmls[i].innerHTML = tr(htmls[i].getAttribute('data-i18n-html'));
+        }
+        const arias = document.querySelectorAll('[data-i18n-aria]');
+        for (let i = 0; i < arias.length; i++) {
+          arias[i].setAttribute('aria-label', tr(arias[i].getAttribute('data-i18n-aria')));
+        }
+      }
+      function setLang(lang) {
+        i18nOverride = (lang === 'ja' || lang === 'en' || lang === 'sv') ? lang : null;
+        applyI18n();
+        if (window.__mdxOnLangChange) {
+          try { window.__mdxOnLangChange(); } catch (e) { /* ignore */ }
+        }
+      }
+      window.__mdxI18n = { tr: tr, setLang: setLang, getLang: function () { return i18nLang; }, detect: i18nDetect, resolve: i18nResolve };
+      applyI18n();
+      /* The manual language select exists only in debug mode
+       * (same development-flag check as the other debug features); the
+       * override is session-only and never persisted. */
+      (function () {
+        let on = false;
+        try {
+          const v = new URLSearchParams(location.search || '').get('debug');
+          if (v) { const lv = String(v).toLowerCase(); on = (lv === '1' || lv === 'true' || lv === 'on'); }
+        } catch (e) { /* ignore */ }
+        if (!on) return;
+        const wrap = document.getElementById('langDebug');
+        if (wrap) wrap.hidden = false;
+        const sel = document.getElementById('langSel');
+        if (sel) sel.addEventListener('change', function () { setLang(sel.value === 'auto' ? null : sel.value); });
+      })();
+    </script>
+    <script>
+      'use strict';
       const $ = (id) => document.getElementById(id);
       const els = {
         title: $('nowTitle'), titleInner: $('nowTitleInner'), meta: $('nowMeta'), warn: $('pdxWarn'),
@@ -3260,7 +3941,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           for (const key of Object.keys(EMBEDDED_FILES)) {
             if (!key.toLowerCase().endsWith('.pdx')) continue;
             if (key.toLowerCase().replace(/\.pdx$/, '') === wantKey) {
-              return { bytes: decodeEmbedded(key), label: key + '（収録）', mismatch: false };
+              return { bytes: decodeEmbedded(key), label: tr('pdx.bundled', { name: key }), mismatch: false };
             }
           }
         }
@@ -3364,26 +4045,27 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       /* [TITLE-MQ-END] */
 
       function describeSong() {
-        els.titleInner.textContent = cur.title || cur.name || '曲が選択されていません';
+        els.titleInner.textContent = cur.title || cur.name || tr('player.noSong');
         updateTitleMarquee();
         if (!cur.mdx) {
-          els.meta.textContent = '下の「動作確認」からテスト曲を選ぶか、.mdx ファイルを読み込んでください。';
+          els.meta.textContent = tr('player.noSongHint');
           els.warn.className = 'warnline'; els.warn.textContent = '';
           return;
         }
-        let meta = 'ファイル: ' + cur.name;
+        let meta;
         if (cur.pdxName) {
-          meta += ' ／ 参照 PDX: ' + cur.pdxName;
-          if (cur.pdxBytes) meta += ' → 読込済み: ' + cur.pdxLabel;
+          meta = cur.pdxBytes
+            ? tr('meta.withPdxLoaded', { name: cur.name, pdx: cur.pdxName, label: cur.pdxLabel })
+            : tr('meta.withPdx', { name: cur.name, pdx: cur.pdxName });
         } else {
-          meta += ' ／ PDX 参照なし（FM のみ）';
+          meta = tr('meta.noPdx', { name: cur.name });
         }
         els.meta.textContent = meta;
         if (cur.pdxName && !cur.pdxBytes) {
-          els.warn.textContent = 'PDX「' + cur.pdxName + '」が未読込のため、PCM チャンネルは無音です（FM のみ再生）。';
+          els.warn.textContent = tr('warn.pdxMissing', { pdx: cur.pdxName });
           els.warn.className = 'warnline show';
         } else if (cur.pdxBytes && cur.pdxMismatch) {
-          els.warn.textContent = '参照名「' + cur.pdxName + '」とは違う名前の PDX ですが、そのまま流用して再生します。';
+          els.warn.textContent = tr('warn.pdxMismatch', { pdx: cur.pdxName });
           els.warn.className = 'warnline show';
         } else {
           els.warn.className = 'warnline'; els.warn.textContent = '';
@@ -3516,24 +4198,25 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           const row = document.createElement('div'); row.className = 'chrow';
           const nm = document.createElement('button'); nm.type = 'button'; nm.className = 'nm nmbtn';
           nm.textContent = i < 8 ? ('FM ' + (i + 1)) : (n > 9 ? ('PCM ' + (i - 7)) : 'PCM');
-          nm.title = nm.textContent + ' の解析パネルを開く';
-          nm.setAttribute('aria-label', nm.textContent + ' の解析パネルを開く');
+          nm.title = tr('ch.openAnalysis', { ch: nm.textContent });
+          nm.setAttribute('aria-label', tr('ch.openAnalysis', { ch: nm.textContent }));
           nm.addEventListener('click', () => openAnalysisPanel(i));
           const led = document.createElement('span'); led.className = 'led';
           const wrap = document.createElement('div'); wrap.className = 'barwrap';
           const fill = document.createElement('div'); fill.className = 'barfill';
           wrap.appendChild(fill); row.appendChild(nm); row.appendChild(led); row.appendChild(wrap);
-          wrap.title = 'クリックでミュート切替';
+          wrap.title = tr('ch.meterTitle');
           wrap.addEventListener('click', () => toggleMute(i));
+          let tagEl = null;
           if (emptyFlags[i]) {
             row.classList.add('empty');
             wrap.style.display = 'none';
-            const tag = document.createElement('span'); tag.className = 'nodata';
-            tag.textContent = 'データなし（空トラック）';
-            row.appendChild(tag);
+            tagEl = document.createElement('span'); tagEl.className = 'nodata';
+            tagEl.textContent = tr('ch.emptyTrack');
+            row.appendChild(tagEl);
           }
           const vp = document.createElement('span'); vp.className = 'vp';
-          vp.title = '音色番号（@）とパン';
+          vp.title = tr('ch.vpTitle');
           let vnum;
           if (i < 8) {
             /* FM rows: the @n is a button that opens the voice
@@ -3541,8 +4224,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
              * a plain span — PCM has no FM voice to show. */
             vnum = document.createElement('button'); vnum.type = 'button'; vnum.className = 'vnum';
             vnum.textContent = '@—';
-            vnum.title = nm.textContent + ' の音色パラメータ詳細を開く';
-            vnum.setAttribute('aria-label', nm.textContent + ' の音色パラメータ詳細を開く');
+            vnum.title = tr('ch.openVoice', { ch: nm.textContent });
+            vnum.setAttribute('aria-label', tr('ch.openVoice', { ch: nm.textContent }));
             vnum.addEventListener('click', () => openVoicePanel(i));
           } else {
             vnum = document.createElement('span'); vnum.className = 'vnum'; vnum.textContent = '@—';
@@ -3559,20 +4242,20 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           vp.appendChild(vnum); vp.appendChild(vpan); row.appendChild(vp);
           const ms = document.createElement('span'); ms.className = 'msbtns';
           const btnM = document.createElement('button'); btnM.type = 'button'; btnM.className = 'msbtn m';
-          btnM.textContent = 'M'; btnM.title = nm.textContent + ' をミュート';
-          btnM.setAttribute('aria-label', nm.textContent + ' ミュート');
+          btnM.textContent = 'M'; btnM.title = tr('ch.muteTitle', { ch: nm.textContent });
+          btnM.setAttribute('aria-label', tr('ch.muteAria', { ch: nm.textContent }));
           btnM.setAttribute('aria-pressed', 'false');
           btnM.addEventListener('click', () => toggleMute(i));
           const btnS = document.createElement('button'); btnS.type = 'button'; btnS.className = 'msbtn s';
-          btnS.textContent = 'S'; btnS.title = nm.textContent + ' をソロ';
-          btnS.setAttribute('aria-label', nm.textContent + ' ソロ');
+          btnS.textContent = 'S'; btnS.title = tr('ch.soloTitle', { ch: nm.textContent });
+          btnS.setAttribute('aria-label', tr('ch.soloAria', { ch: nm.textContent }));
           btnS.setAttribute('aria-pressed', 'false');
           btnS.addEventListener('click', () => toggleSolo(i));
           ms.appendChild(btnM); ms.appendChild(btnS); row.appendChild(ms);
           const kb = buildChannelKeyboard();
           row.appendChild(kb.el);
           els.chList.appendChild(row);
-          chRows.push({ led, fill, keys: kb.keys, lit: null, row, btnM, btnS, vnum, vpan: plab, panDial, panNeedle, nm, _vTxt: '@—', _pTxt: '—', _pRaw: -1 });
+          chRows.push({ led, fill, keys: kb.keys, lit: null, row, btnM, btnS, vnum, vpan: plab, panDial, panNeedle, nm, wrap, tag: tagEl, _vTxt: '@—', _pTxt: '—', _pRaw: -1 });
         }
         refreshMuteSoloDisplay();
         buildAnalysisOptions(n);
@@ -3689,17 +4372,17 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (!detail || detail.ch !== voicePanelCh) return;
         voicePanelVoiceNum = (typeof detail.voiceNum === 'number') ? detail.voiceNum : null;
         const chLabel = 'FM ' + (voicePanelCh + 1);
-        const title = '音色パラメータ詳細 — ' + chLabel;
+        const title = tr('voice.titleCh', { ch: chLabel });
         if (els.voiceTitle.textContent !== title) els.voiceTitle.textContent = title;
         if (!detail.found) {
           setVoiceHead(chLabel, '@' + detail.voiceNum, '—', '—');
-          const msg = chLabel + ' の音色 @' + detail.voiceNum + ' は、この曲に定義されていません。';
+          const msg = tr('voice.notDefined', { ch: chLabel, n: detail.voiceNum });
           if (els.voiceMeta.textContent !== msg) els.voiceMeta.textContent = msg;
           clearVoiceCells();
           return;
         }
         setVoiceHead(chLabel, '@' + detail.voiceNum, String(detail.alg), String(detail.fb));
-        const meta = chLabel + ' の現在音色 @' + detail.voiceNum + '（エンジンが読み込んだ @ 定義そのもの）';
+        const meta = tr('voice.currentMeta', { ch: chLabel, n: detail.voiceNum });
         if (els.voiceMeta.textContent !== meta) els.voiceMeta.textContent = meta;
         for (let p = 0; p < VOICE_PARAMS.length; p++) {
           const key = VOICE_PARAMS[p][1];
@@ -3729,10 +4412,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         els.voicePanel.hidden = false;
         if (!backend && !cur.mdx) {
           const chLabel = 'FM ' + (ch + 1);
-          const title = '音色パラメータ詳細 — ' + chLabel;
+          const title = tr('voice.titleCh', { ch: chLabel });
           if (els.voiceTitle.textContent !== title) els.voiceTitle.textContent = title;
           setVoiceHead(chLabel, '—', '—', '—');
-          els.voiceMeta.textContent = '曲を読み込んで再生すると、そのチャンネルの現在音色のパラメータが表示されます。';
+          els.voiceMeta.textContent = tr('voice.emptyMeta');
           clearVoiceCells();
           return;
         }
@@ -3779,7 +4462,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const r = Math.round(m);
         return NOTE_NAMES[((r % 12) + 12) % 12] + (Math.floor(r / 12) - 1);
       }
-      const LFO_WAVE_NAMES = ['0（ランプ）', '1（矩形／ステップ）', '2（三角）', '3（ランダム）'];
+      function lfoWaveName(w) { return tr('lfo.wave' + (w & 3)); }
       /* (panel state — anCh / anData / anPlaying / anDraws / anTxt —
        * is declared next to chRows above; see the note there) */
       function anSet(key, el, txt) { if (anTxt[key] !== txt) { anTxt[key] = txt; el.textContent = txt; } }
@@ -3808,9 +4491,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         refreshAnalysisTarget();
         meterSync();
         if (!backend && !cur.mdx) {
-          const title = 'チャンネル解析 — ' + anChLabel(ch);
+          const title = tr('an.titleCh', { ch: anChLabel(ch) });
           if (els.anTitle.textContent !== title) els.anTitle.textContent = title;
-          anSet('meta', els.anMeta, '曲を読み込んで再生すると、そのチャンネルのピッチ／音量トレースと LFO の状態が表示されます。');
+          anSet('meta', els.anMeta, tr('an.emptyMeta'));
           return;
         }
         requestAnalysis();
@@ -3845,11 +4528,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (anCh == null || !data || data.ch !== anCh) return;
         anData = data;
         const label = anChLabel(anCh);
-        const title = 'チャンネル解析 — ' + label;
+        const title = tr('an.titleCh', { ch: label });
         if (els.anTitle.textContent !== title) els.anTitle.textContent = title;
         const secs = data.tickMs ? data.pitch.length * data.tickMs / 1000 : 0;
-        anSet('meta', els.anMeta, label + ' の直近 ' + data.pitch.length + ' tick（約 ' + secs.toFixed(1) + ' 秒）の履歴です。');
-        anSet('note', els.anNote, data.nominalNow != null ? (noteNameOf(data.nominalNow) + '（MIDI ' + data.nominalNow + '）') : '—');
+        anSet('meta', els.anMeta, tr('an.historyMeta', { ch: label, ticks: data.pitch.length, secs: secs.toFixed(1) }));
+        anSet('note', els.anNote, data.nominalNow != null ? tr('an.noteVal', { note: noteNameOf(data.nominalNow), n: data.nominalNow }) : '—');
         anSet('pitch', els.anPitch, data.pitchNow != null ? data.pitchNow.toFixed(2) : '—');
         /* Instantaneous readings go to the needle meters, not to
          * numeric fields (v26): the tuner target is the reported
@@ -3860,16 +4543,16 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         mtTuner.target = (typeof data.detuneCents === 'number' && isFinite(data.detuneCents))
           ? Math.max(-650, Math.min(650, data.detuneCents)) : null;
         mtVu.target = vuFracFromVol(data.vol.length ? data.vol[data.vol.length - 1] : 0);
-        anSet('dset', els.anDetuneSet, (typeof data.detuneRaw === 'number') ? (fmtCents(data.detuneRaw * 100 / 64) + '（生値 ' + data.detuneRaw + '）') : '—');
+        anSet('dset', els.anDetuneSet, (typeof data.detuneRaw === 'number') ? tr('an.detuneSetVal', { cents: fmtCents(data.detuneRaw * 100 / 64), raw: data.detuneRaw }) : '—');
         anSet('porta', els.anPorta, (typeof data.portamentoRaw === 'number') ? String(data.portamentoRaw) : '—');
         const pl = data.pitchLfo, vl = data.volLfo;
         anSet('lfop', els.anLfoPitch, pl ? (pl.on
-          ? ('ON ／ 波形 ' + (LFO_WAVE_NAMES[pl.wave & 3] || String(pl.wave)) + ' ／ 周期 ' + pl.lenRaw + ' tick ／ 深さ（デルタ開始値） ' + pl.deltaStart + ' ／ 現在オフセット ' + fmtCents(pl.offsetNow * 100 / 64))
+          ? tr('lfo.pitchOn', { wave: lfoWaveName(pl.wave), len: pl.lenRaw, delta: pl.deltaStart, offset: fmtCents(pl.offsetNow * 100 / 64) })
           : 'OFF') : '—');
         anSet('lfov', els.anLfoVol, vl ? (vl.on
-          ? ('ON ／ 波形 ' + (LFO_WAVE_NAMES[vl.wave & 3] || String(vl.wave)) + ' ／ 周期 ' + vl.length + ' tick ／ 深さ（デルタ開始値） ' + vl.deltaStart + ' ／ 現在の減衰 ' + vl.offsetNow)
+          ? tr('lfo.volOn', { wave: lfoWaveName(vl.wave), len: vl.length, delta: vl.deltaStart, offset: vl.offsetNow })
           : 'OFF') : '—');
-        anSet('lfod', els.anLfoDelay, '設定 ' + data.lfoDelay + ' tick ／ 残り ' + data.lfoDelayCnt + ' tick');
+        anSet('lfod', els.anLfoDelay, tr('lfo.delayVal', { set: data.lfoDelay, left: data.lfoDelayCnt }));
         drawAnalysis();
       }
       /* ---------------- needle meters (v26) ----------------
@@ -4203,7 +4886,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           cuSet('lfop', els.cuLfoPitch, '—'); cuSet('lfov', els.cuLfoVol, '—'); cuSet('lfod', els.cuLfoDelay, '—');
         }
         els.cuPanel.hidden = false;
-        const title = 'ソロ・クローズアップ — ' + anChLabel(ch);
+        const title = tr('cu.titleCh', { ch: anChLabel(ch) });
         if (els.cuTitle.textContent !== title) els.cuTitle.textContent = title;
         cuSet('ch', els.cuCh, anChLabel(ch));
         if (!cuPositioned) cuPositionPanel();
@@ -4288,7 +4971,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         cuSet('voice', els.cuVoice, (s.voices && typeof s.voices[cuCh] === 'number') ? '@' + s.voices[cuCh] : '@—');
         cuSet('pan', els.cuPan, (s.pans && typeof s.pans[cuCh] === 'number') ? PAN_LABELS[s.pans[cuCh] & 3] : '—');
         const n = (s.notes && typeof s.notes[cuCh] === 'number' && isFinite(s.notes[cuCh])) ? s.notes[cuCh] : null;
-        cuSet('note', els.cuNote, n != null ? (noteNameOf(n) + '\n（MIDI ' + n.toFixed(1) + '）') : '—');
+        cuSet('note', els.cuNote, n != null ? tr('cu.noteVal', { note: noteNameOf(n), n: n.toFixed(1) }) : '—');
       }
       function cuDrawKeyboard() {
         const cv = els.cuKbCv;
@@ -4376,7 +5059,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         } else {
           g.fillStyle = dimCol;
           g.font = Math.round(9.5 * dpr) + 'px ui-monospace, Menlo, monospace';
-          g.fillText('（無音）', 4 * dpr, 11 * dpr);
+          g.fillText(tr('cu.silent'), 4 * dpr, 11 * dpr);
         }
       }
       /* ---- needle meters (same scales / springs as v26) ---- */
@@ -4575,16 +5258,16 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
          * They ride on the analysis response the close-up already
          * requests — no extra engine traffic. */
         cuSet('pitch', els.cuPitch, data.pitchNow != null ? data.pitchNow.toFixed(2) : '—');
-        cuSet('dset', els.cuDetuneSet, (typeof data.detuneRaw === 'number') ? (fmtCents(data.detuneRaw * 100 / 64) + '（生値 ' + data.detuneRaw + '）') : '—');
+        cuSet('dset', els.cuDetuneSet, (typeof data.detuneRaw === 'number') ? tr('an.detuneSetVal', { cents: fmtCents(data.detuneRaw * 100 / 64), raw: data.detuneRaw }) : '—');
         cuSet('porta', els.cuPorta, (typeof data.portamentoRaw === 'number') ? String(data.portamentoRaw) : '—');
         const pl = data.pitchLfo, vl = data.volLfo;
         cuSet('lfop', els.cuLfoPitch, pl ? (pl.on
-          ? ('ON ／ 波形 ' + (LFO_WAVE_NAMES[pl.wave & 3] || String(pl.wave)) + ' ／ 周期 ' + pl.lenRaw + ' tick ／ 深さ（デルタ開始値） ' + pl.deltaStart + ' ／ 現在オフセット ' + fmtCents(pl.offsetNow * 100 / 64))
+          ? tr('lfo.pitchOn', { wave: lfoWaveName(pl.wave), len: pl.lenRaw, delta: pl.deltaStart, offset: fmtCents(pl.offsetNow * 100 / 64) })
           : 'OFF') : '—');
         cuSet('lfov', els.cuLfoVol, vl ? (vl.on
-          ? ('ON ／ 波形 ' + (LFO_WAVE_NAMES[vl.wave & 3] || String(vl.wave)) + ' ／ 周期 ' + vl.length + ' tick ／ 深さ（デルタ開始値） ' + vl.deltaStart + ' ／ 現在の減衰 ' + vl.offsetNow)
+          ? tr('lfo.volOn', { wave: lfoWaveName(vl.wave), len: vl.length, delta: vl.deltaStart, offset: vl.offsetNow })
           : 'OFF') : '—');
-        cuSet('lfod', els.cuLfoDelay, '設定 ' + data.lfoDelay + ' tick ／ 残り ' + data.lfoDelayCnt + ' tick');
+        cuSet('lfod', els.cuLfoDelay, tr('lfo.delayVal', { set: data.lfoDelay, left: data.lfoDelayCnt }));
         cuDrawCuTraces();
       }
       /* ---- voice parameters (voice-detail report, as v24) ---- */
@@ -4601,10 +5284,10 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           /* PCM channels have no FM voice — the same treatment as
            * the voice detail panel, which PCM rows never open. */
           cuSet('vnum', els.cuNum, '—'); cuSet('valg', els.cuAlg, '—'); cuSet('vfb', els.cuFb, '—');
-          cuSet('vmeta', els.cuVoiceMeta, anChLabel(cuCh) + ' は PCM チャンネルです。FM 音色パラメータはありません（音色番号は PDX サンプルの番号です）。');
+          cuSet('vmeta', els.cuVoiceMeta, tr('cu.pcmMeta', { ch: anChLabel(cuCh) }));
           cuClearVoiceCells();
         } else if (cuVoiceNum == null) {
-          cuSet('vmeta', els.cuVoiceMeta, anChLabel(cuCh) + ' の現在音色のパラメータです（エンジンが読み込んだ @ 定義そのもの）。');
+          cuSet('vmeta', els.cuVoiceMeta, tr('cu.voiceMetaDefault', { ch: anChLabel(cuCh) }));
         }
       }
       function cuRequestVoiceDetail() {
@@ -4623,14 +5306,14 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const chLabel = anChLabel(cuCh);
         if (!detail.found) {
           cuSet('vnum', els.cuNum, '@' + detail.voiceNum); cuSet('valg', els.cuAlg, '—'); cuSet('vfb', els.cuFb, '—');
-          cuSet('vmeta', els.cuVoiceMeta, chLabel + ' の音色 @' + detail.voiceNum + ' は、この曲に定義されていません。');
+          cuSet('vmeta', els.cuVoiceMeta, tr('voice.notDefined', { ch: chLabel, n: detail.voiceNum }));
           cuClearVoiceCells();
           return;
         }
         cuSet('vnum', els.cuNum, '@' + detail.voiceNum);
         cuSet('valg', els.cuAlg, String(detail.alg));
         cuSet('vfb', els.cuFb, String(detail.fb));
-        cuSet('vmeta', els.cuVoiceMeta, chLabel + ' の現在音色 @' + detail.voiceNum + '（エンジンが読み込んだ @ 定義そのもの）');
+        cuSet('vmeta', els.cuVoiceMeta, tr('voice.currentMeta', { ch: chLabel, n: detail.voiceNum }));
         for (let p = 0; p < VOICE_PARAMS.length; p++) {
           const key = VOICE_PARAMS[p][1];
           for (let o = 0; o < 4; o++) {
@@ -4755,7 +5438,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const lc = String(s.loopCount || 0);
         if (els.loopCount.textContent !== lc) els.loopCount.textContent = lc;
         updateProgress(s);
-        const pl = s.playing ? '❚❚ 一時停止' : '▶ 再生';
+        const pl = s.playing ? tr('btn.pause') : tr('btn.play');
         if (els.play.textContent !== pl) els.play.textContent = pl;
         if (s.levels) {
           if (s.levels.length !== chRows.length) buildChannels(s.levels.length);
@@ -4779,7 +5462,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (s.playing && !s.ended) specStart(); else specStop();
         let justEnded = false;
         if (s.ended) {
-          if (!endedNotified) { endedNotified = true; justEnded = true; setStatus('演奏が終了しました。'); }
+          if (!endedNotified) { endedNotified = true; justEnded = true; setStatus(tr('status.ended')); }
         } else {
           endedNotified = false;
         }
@@ -5109,17 +5792,29 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           try {
             const p = actx.resume();
             if (p && p.then) p.then(() => {
-              if (actx && actx.state === 'running' && isPlaying && cur.name) setStatus('再生中: ' + cur.name);
+              if (actx && actx.state === 'running' && isPlaying && cur.name) setStatus(tr('status.playing', { name: cur.name }));
             }, () => {});
           } catch (e) { /* ignore */ }
         }
       }
       document.addEventListener('pointerdown', primeAudio, true);
       document.addEventListener('keydown', primeAudio, true);
+      /* Engine error strings arrive from the engine (kept
+       * byte-identical, Japanese included). When the ymfm init
+       * failure is shown in the UI, only its fixed prefix is
+       * replaced with the catalog translation (prefix match);
+       * the trailing " [ErrorName: message]" part is kept. */
+      const ENGINE_YMFM_FAIL_JA = 'ymfm (libymfm.wasm) の初期化に失敗しました';
+      function localizeEngineError(msg) {
+        if (typeof msg === 'string' && msg.indexOf(ENGINE_YMFM_FAIL_JA) === 0) {
+          return tr('engine.ymfmFail') + msg.slice(ENGINE_YMFM_FAIL_JA.length);
+        }
+        return msg;
+      }
       async function ensureAudio() {
         if (backend) { await resumeCtx(); return backend; }
         const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) { setStatus('このブラウザでは Web Audio が使えません。'); return null; }
+        if (!AC) { setStatus(tr('status.noWebAudio')); return null; }
         if (!actx) actx = new AC(); /* reuse the gesture-primed context when there is one */
         ensureAnalyser(); /* spectrum pass-through; nodes below connect via masterOut() */
         /* try AudioWorklet first */
@@ -5138,7 +5833,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           workletNode.port.onmessage = (e) => {
             const m = e.data;
             if (m.type === 'state') showState(m);
-            else if (m.type === 'error') setStatus('再生エラー: ' + m.message);
+            else if (m.type === 'error') setStatus(tr('status.playError', { msg: m.message }));
             else if (m.type === 'loaded' && m.nTracks) {
               /* Post-unload guard, same rule as showState's (v64):
                * 'loaded' is a load acknowledgement, not a state
@@ -5160,7 +5855,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           };
           workletNode.connect(masterOut());
           await resumeCtx();
-          setStatus('FM コア (ymfm / WASM) を初期化中…');
+          setStatus(tr('status.fmInit'));
           let fmResult = '__timeout__';
           for (let i = 0; i < 40; i++) {
             workletNode.port.postMessage({ type: 'ping' });
@@ -5180,13 +5875,13 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
               try { localPlayer.render(L, R, L.length); } catch (err) { localPlayer.playing = false; }
             };
             scriptNode.connect(masterOut());
-            setStatus('FM コア (ymfm / WASM) を初期化中…');
+            setStatus(tr('status.fmInit'));
             const fmOkMain = await withTimeout(MDXEngine.ready, 10000);
             if (fmOkMain !== true) {
               const fe = (MDXEngine.ymfmState && MDXEngine.ymfmState.error) || null;
               let detail = fe ? (fe.name ? fe.name + ': ' : '') + (fe.message || String(fe)) : (fmOkMain === '__timeout__' ? 'timeout (10s)' : 'unknown error');
-              if (workletFmError) detail += ' / worklet: ' + workletFmError;
-              setStatus('FM コア (ymfm / WASM) の初期化に失敗しました。詳細: ' + detail);
+              if (workletFmError) detail += ' / worklet: ' + localizeEngineError(workletFmError);
+              setStatus(tr('status.fmFail', { detail }));
               try { scriptNode.disconnect(); } catch (e4) {}
               return null;
             }
@@ -5209,7 +5904,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
               }
             }, 150);
           } catch (e2) {
-            setStatus('音声出力の初期化に失敗しました。');
+            setStatus(tr('status.audioInitFail'));
             return null;
           }
         }
@@ -5251,7 +5946,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       let isPlaying = false;
       function reflectPlay(s) {
-        isPlaying = s; els.play.textContent = s ? '❚❚ 一時停止' : '▶ 再生';
+        isPlaying = s; els.play.textContent = s ? tr('btn.pause') : tr('btn.play');
         if (s) specStart(); else specStop();
       }
 
@@ -5342,7 +6037,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         try {
           if (isLzxBytes(mdxBytes)) lzxExpanded = true;
           mdxBytes = maybeExpandLzx(mdxBytes);
-        } catch (e) { setStatus('LZX展開に失敗しました: ' + e.message); return; }
+        } catch (e) { setStatus(tr('status.lzxFail', { msg: e.message })); return; }
         /* A manually chosen song cancels continuous random mode;
          * random picks (source 'catalog' / 'folder') keep it. The
          * __mdxRandomOff call itself sits at the commit point
@@ -5351,7 +6046,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const outsideList = source !== 'catalog' && source !== 'folder';
         let info;
         try { info = MDXEngine.parseMDX(mdxBytes); }
-        catch (e) { setStatus('MDX の読み込みに失敗しました: ' + e.message); return; }
+        catch (e) { setStatus(tr('status.mdxFail', { msg: e.message })); return; }
         chMute = []; chSolo = []; refreshMuteSoloDisplay(); /* mute/solo resets on every song load */
         closeVoicePanel(); /* the voice detail panel closes on every song load */
         closeAnalysisPanel(); /* the analysis panel closes on every song load too */
@@ -5364,7 +6059,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           try {
             if (isLzxBytes(pdxBytes)) lzxExpanded = true;
             pdxBytes = maybeExpandLzx(pdxBytes);
-          } catch (e) { setStatus('LZX展開に失敗しました: ' + e.message); return; }
+          } catch (e) { setStatus(tr('status.lzxFail', { msg: e.message })); return; }
         }
         /* Commit point (v65): every failure exit of this load is
          * behind it now — the MDX LZX expansion above, the MDX
@@ -5387,7 +6082,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const installedCur = cur; /* identity check for the generation bail below (v63) */
         describeSong();
         resetProgress(); /* the progress bar restarts empty for the new song, until its first state report */
-        if (lzxExpanded) els.meta.textContent += ' ／ LZX圧縮ファイルを展開しました';
+        if (lzxExpanded) els.meta.textContent += tr('meta.lzxSuffix');
         document.querySelectorAll('.song').forEach(el => el.classList.toggle('playing', el.dataset && el.dataset.file === name));
         /* A committed load supersedes any pause/stop suspend that
          * is still pending: the new song's own state reports (and
@@ -5420,9 +6115,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         sendCmd('volume', els.vol.value / 100);
         sendCmd('tempo', els.tempoRate.value / 100);
         sendCmd('loop', loopOn);
-        if (autoplay) { sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + name); }
-        else setStatus('読み込みました: ' + name);
-        if (actx && actx.state !== 'running') setStatus('音声がブラウザに止められています。画面をクリック／タップすると再生が始まります。');
+        if (autoplay) { sendCmd('play'); reflectPlay(true); setStatus(tr('status.playing', { name })); }
+        else setStatus(tr('status.loaded', { name }));
+        if (actx && actx.state !== 'running') setStatus(tr('status.audioBlocked'));
       }
 
       /* ---------------- unload (folder clear, v62) ----------------
@@ -5475,8 +6170,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           try { title = MDXEngine.parseMDX(decodeEmbedded(fn)).title || fn; } catch (e) { /* keep name */ }
           const b = document.createElement('button');
           b.type = 'button'; b.className = 'song'; b.dataset.file = fn;
-          const f = document.createElement('span'); f.className = 'fn'; f.textContent = fn;
-          const t = document.createElement('span'); t.className = 'tt'; t.textContent = title;
+          const f = document.createElement('span'); f.className = 'fn'; f.setAttribute('lang', 'ja'); f.textContent = fn;
+          const t = document.createElement('span'); t.className = 'tt'; t.setAttribute('lang', 'ja'); t.textContent = title;
           b.appendChild(f); b.appendChild(t);
           b.addEventListener('click', () => loadSong(decodeEmbedded(fn), fn, 'library', true));
           container.appendChild(b);
@@ -5484,16 +6179,16 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       }
       addLibraryButtons(LIBRARY, els.songList);
       addLibraryButtons(LIBRARY_EXTRA, els.songList2);
-      $('btnTest').addEventListener('click', () => loadSong(MDXEngine.buildTestMdx(), 'TEST (合成)', 'test', true));
+      $('btnTest').addEventListener('click', () => loadSong(MDXEngine.buildTestMdx(), tr('test.name'), 'test', true));
 
       /* ---------------- transport ---------------- */
       let loopOn = true;
       els.play.addEventListener('click', async () => {
-        if (!cur.mdx) { await loadSong(MDXEngine.buildTestMdx(), 'TEST (合成)', 'test', true); return; }
+        if (!cur.mdx) { await loadSong(MDXEngine.buildTestMdx(), tr('test.name'), 'test', true); return; }
         const be = await ensureAudio(); if (!be) return;
         sendMuteSolo();
-        if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus('一時停止中'); armSuspendPending(); }
-        else { cancelSuspendPending(); sendCmd('play'); reflectPlay(true); setStatus('再生中: ' + cur.name); if (window.__mdxSeqResume) window.__mdxSeqResume(); }
+        if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus(tr('status.paused')); armSuspendPending(); }
+        else { cancelSuspendPending(); sendCmd('play'); reflectPlay(true); setStatus(tr('status.playing', { name: cur.name })); if (window.__mdxSeqResume) window.__mdxSeqResume(); }
       });
       els.stop.addEventListener('click', async () => {
         /* Folder sequential mode is only parked by stop (position
@@ -5505,7 +6200,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         closeVoicePanel();
         closeAnalysisPanel();
         const be = await ensureAudio(); if (!be) return;
-        sendCmd('stop'); reflectPlay(false); setStatus('停止しました。');
+        sendCmd('stop'); reflectPlay(false); setStatus(tr('status.stopped'));
         showState({ elapsed: 0, tempo: null, tickMs: null, loopCount: 0, levels: chRows.map(() => 0), keyOns: chRows.map(() => false), playing: false });
         /* Arm after the synthetic showState above: that report is
          * UI-made and must not settle the pending suspend — only a
@@ -5520,7 +6215,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       els.loop.addEventListener('click', () => {
         loopOn = !loopOn;
         els.loop.setAttribute('aria-pressed', String(loopOn));
-        els.loop.textContent = loopOn ? 'ループ ON' : 'ループ OFF';
+        els.loop.textContent = loopOn ? tr('btn.loopOn') : tr('btn.loopOff');
         sendCmd('loop', loopOn);
       });
       els.vol.addEventListener('input', () => sendCmd('volume', els.vol.value / 100));
@@ -5567,8 +6262,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
               cur.pdxMismatch = f.name.toLowerCase() !== cur.pdxName.toLowerCase();
               describeSong();
               if (backend) sendSetPdx(buf);
-              setStatus('PDX を読み込みました: ' + f.name + '（現在の曲に適用）');
-            } else setStatus('PDX を読み込みました: ' + f.name + '（次の MDX 読み込み時に使います）');
+              setStatus(tr('pdx.loadedApplied', { name: f.name }));
+            } else setStatus(tr('pdx.loadedPending', { name: f.name }));
           } else if (lower.endsWith('.mdx')) {
             if (!mdxFile) mdxFile = f;
           }
@@ -5583,6 +6278,58 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       ['dragenter', 'dragover'].forEach(ev => els.dropBox.addEventListener(ev, (e) => { e.preventDefault(); els.dropBox.classList.add('drag'); }));
       ['dragleave', 'drop'].forEach(ev => els.dropBox.addEventListener(ev, (e) => { e.preventDefault(); els.dropBox.classList.remove('drag'); }));
       els.dropBox.addEventListener('drop', (e) => handleFiles(e.dataTransfer && e.dataTransfer.files));
+      /* i18n (v74): on a language switch, re-render the
+       * state-dependent labels. Status lines already shown are
+       * NOT re-translated (spec G); they update on their next
+       * refresh. Static text, lang and title are handled by
+       * applyI18n() itself. */
+      window.__mdxOnLangChange = function () {
+        reflectPlay(isPlaying);
+        els.loop.textContent = loopOn ? tr('btn.loopOn') : tr('btn.loopOff');
+        describeSong();
+        for (let i = 0; i < chRows.length; i++) {
+          const r = chRows[i];
+          if (!r || !r.nm) continue;
+          const label = r.nm.textContent;
+          r.nm.title = tr('ch.openAnalysis', { ch: label });
+          r.nm.setAttribute('aria-label', tr('ch.openAnalysis', { ch: label }));
+          if (r.wrap) r.wrap.title = tr('ch.meterTitle');
+          if (r.tag) r.tag.textContent = tr('ch.emptyTrack');
+          if (r.vnum && r.vnum.tagName === 'BUTTON') {
+            r.vnum.title = tr('ch.openVoice', { ch: label });
+            r.vnum.setAttribute('aria-label', tr('ch.openVoice', { ch: label }));
+          }
+          if (r.btnM) {
+            r.btnM.title = tr('ch.muteTitle', { ch: label });
+            r.btnM.setAttribute('aria-label', tr('ch.muteAria', { ch: label }));
+          }
+          if (r.btnS) {
+            r.btnS.title = tr('ch.soloTitle', { ch: label });
+            r.btnS.setAttribute('aria-label', tr('ch.soloAria', { ch: label }));
+          }
+        }
+        if (voicePanelCh != null && els.voicePanel && !els.voicePanel.hidden) {
+          if (backend || cur.mdx) requestVoiceDetail();
+          else {
+            els.voiceTitle.textContent = tr('voice.titleCh', { ch: 'FM ' + (voicePanelCh + 1) });
+            els.voiceMeta.textContent = tr('voice.emptyMeta');
+          }
+        }
+        if (anCh != null && els.anPanel && !els.anPanel.hidden) {
+          if (anData) renderAnalysis(anData);
+          else if (!backend && !cur.mdx) {
+            els.anTitle.textContent = tr('an.titleCh', { ch: anChLabel(anCh) });
+            anSet('meta', els.anMeta, tr('an.emptyMeta'));
+          } else requestAnalysis();
+        }
+        if (cuCh != null && els.cuPanel && !els.cuPanel.hidden) {
+          els.cuTitle.textContent = tr('cu.titleCh', { ch: anChLabel(cuCh) });
+          cuRefreshVoicePane();
+          if (cuState) cuUpdateHeader(cuState);
+          if (cuData) cuRenderAnalysis(cuData);
+          if (cuCh < 8 && (backend || cur.mdx)) cuRequestVoiceDetail();
+        }
+      };
     </script>
 
     <!-- ================= folder playback (sequential / debug random) =================
@@ -5693,6 +6440,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const kindLabel = fail.kind === 'lzx' ? 'LZX展開失敗'
           : fail.kind === 'parse' ? '解析失敗' : '読み込み失敗';
         const li = document.createElement('li');
+        li.setAttribute('lang', 'ja');
         li.textContent = (fail.path || fail.name || '(不明な曲)') + ' — ' + kindLabel
           + (fail.message ? ': ' + fail.message : '');
         list.appendChild(li);
@@ -5901,7 +6649,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       function reportRoot(name) {
         lastRootName = name;
         rebuildFolderSongs();
-        let msg = '読み込み済み: ' + name + '（MDX ' + folderSongs.length.toLocaleString('ja-JP') + ' 曲見つかりました ／ 索引 ' + rootFiles.size.toLocaleString('ja-JP') + ' 件）';
+        let msg = tr('folder.loadedInfo', { name, mdx: fmtNum(folderSongs.length), idx: fmtNum(rootFiles.size) });
         if (catalog) {
           /* findFile() hits iff the exact key or the bare file name is
              in the index (its '/'-suffix scan is subsumed by the name
@@ -5915,7 +6663,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             const key = normKey(s.relpath);
             if (rootFiles.has(key) || names.has(key.split('/').pop())) catalogPresent.push(s);
           }
-          msg += ' ／ カタログの ' + catalogPresent.length.toLocaleString('ja-JP') + ' 曲と一致';
+          msg += tr('folder.catalogMatch', { n: fmtNum(catalogPresent.length) });
         }
         catEls.rootStatus.textContent = msg;
         updateSeqUi();
@@ -5924,7 +6672,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (window.showDirectoryPicker) {
           try {
             const dir = await window.showDirectoryPicker();
-            catEls.rootStatus.textContent = 'フォルダ「' + dir.name + '」を走査中…';
+            catEls.rootStatus.textContent = tr('folder.scanning', { name: dir.name });
             const genAtScan = folderGen; /* v62: a clear during the scan discards its result */
             const map = new Map();
             await indexHandleTree(dir, '', map);
@@ -5933,7 +6681,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             mergeRootFiles(map, dir.name);
           } catch (e) {
             if (e && e.name !== 'AbortError') {
-              catEls.rootStatus.textContent = 'フォルダ選択に失敗しました: ' + e.message + '（フォルダを上の枠へドラッグ＆ドロップするか、「ファイルをまとめて選ぶ」を試してください）';
+              catEls.rootStatus.textContent = tr('folder.pickFailed', { msg: e.message });
             }
           }
         } else {
@@ -5950,9 +6698,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         catEls.dirInput.value = '';
         if (!files.length) return;
         try {
-          mergeRootFiles(indexFileList(files), (files[0].webkitRelativePath || '').split('/')[0] || '選択フォルダ');
+          mergeRootFiles(indexFileList(files), (files[0].webkitRelativePath || '').split('/')[0] || tr('folder.selectedFolder'));
         } catch (e) {
-          catEls.rootStatus.textContent = 'フォルダの読み込みに失敗しました: ' + e.message;
+          catEls.rootStatus.textContent = tr('folder.loadFailed', { msg: e.message });
         }
       });
       /* (c) plain multi-file selection (adds to the index) */
@@ -5963,9 +6711,9 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         catEls.filesInput.value = '';
         if (!files.length) return;
         try {
-          mergeRootFiles(indexFileList(files), 'ファイル ' + files.length + ' 件を追加');
+          mergeRootFiles(indexFileList(files), tr('folder.filesAddedLabel', { n: files.length }));
         } catch (e) {
-          catEls.rootStatus.textContent = 'ファイルの読み込みに失敗しました: ' + e.message;
+          catEls.rootStatus.textContent = tr('file.loadFailed', { msg: e.message });
         }
       });
       /* (b) drag & drop of folders / files */
@@ -5995,7 +6743,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const dt = e.dataTransfer;
         if (!dt) return;
         const genAtScan = folderGen; /* v62: a clear during the scan discards its result */
-        catEls.rootStatus.textContent = 'ドロップされたフォルダを走査中…';
+        catEls.rootStatus.textContent = tr('folder.dropScanning');
         const map = new Map();
         const entries = [];
         if (dt.items) {
@@ -6012,11 +6760,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         }
         if (genAtScan !== folderGen) return; /* v62: cleared while scanning: keep the cleared state and its status lines */
         if (!map.size) {
-          catEls.rootStatus.textContent = 'ドロップからファイルを取り込めませんでした。「ファイルをまとめて選ぶ」を試してください。';
+          catEls.rootStatus.textContent = tr('folder.dropFailed');
           return;
         }
         addStrippedVariants(map);
-        mergeRootFiles(map, 'ドラッグ＆ドロップ');
+        mergeRootFiles(map, tr('folder.dndLabel'));
       });
 
       /* ---------------- file lookup ---------------- */
@@ -6164,12 +6912,12 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       let safetyNotePending = false; /* a safety advance is in flight: the status line the advance produces carries the reason */
       function safetyReset() { safetyPlayedSec = 0; safetyPrev = null; }
       function safetyLimitLabel() {
-        return String(Math.round(safetyLimitMin * 1000) / 1000) + '分';
+        return tr('safety.limitLabel', { v: String(Math.round(safetyLimitMin * 1000) / 1000) });
       }
       function takeSafetyNote(verb) {
         if (!safetyNotePending) return '';
         safetyNotePending = false;
-        return '（時間の保険：再生時間が設定の ' + safetyLimitLabel() + ' を超えたため、' + verb + '）';
+        return tr('safety.noteText', { limit: safetyLimitLabel(), verb: tr(verb) });
       }
       const safetyInput = $('safetyMinutes');
       if (safetyInput) {
@@ -6236,11 +6984,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const wasSeq = seqActive;
         if (seqActive) stopSequential('');
         if (!contMode) {
-          if (wasSeq) setRandStatus('フォルダ順次再生を終了しました。');
+          if (wasSeq) setRandStatus(tr('seq.ended'));;
           return;
         }
         setContMode(false);
-        setRandStatus('連続ランダム再生モードを OFF にしました。');
+        setRandStatus(tr('rand.modeOff'));;
       };
       /* Stop button. Random mode keeps its old behaviour (mode
        * OFF, via __mdxRandomOff). Sequential mode is only PARKED:
@@ -6263,7 +7011,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         seqAwaitConfirm = false; seqSwallowedEnd = false;
         if (seqConfirmTimer != null) { clearTimeout(seqConfirmTimer); seqConfirmTimer = null; }
         updateSeqUi(); updateAdvanceFlag();
-        setRandStatus('フォルダ順次再生を停止しました（位置は保持しています）。');
+        setRandStatus(tr('seq.parked'));;
       };
       /* Play button: when sequential mode is parked, pressing
        * play restarts the parked song from the top (the engine
@@ -6274,7 +7022,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         seqParked = false;
         seqBaseLoop = null; /* re-captured by the state hook */
         updateSeqUi(); updateAdvanceFlag();
-        setRandStatus('フォルダ順次再生を再開しました。');
+        setRandStatus(tr('seq.resumed'));;
       };
       window.__mdxContModeOn = false;
       /* Returns true when this report makes either mode advance
@@ -6443,7 +7191,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
                 const sbStop = $('btnStop');
                 if (sbStop) sbStop.click();
                 seqStopRequested = false; /* that click was ours, not a new request */
-                if (fails > 0) setRandStatus(catEls.rStatus.textContent + '（読み込めない ' + fails + ' 曲を飛ばしました）');
+                if (fails > 0) setRandStatus(catEls.rStatus.textContent + tr('seq.skippedSuffix', { n: fails }));
                 return true;
               }
               seqParked = false; /* a song starting (again) un-parks the mode */
@@ -6467,7 +7215,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
                 if (seqSwallowedEnd && seqActive) { seqSwallowedEnd = false; advanceSequential(); }
                 seqSwallowedEnd = false;
               }, 2500);
-              if (fails > 0) setRandStatus(catEls.rStatus.textContent + '（読み込めない ' + fails + ' 曲を飛ばしました）');
+              if (fails > 0) setRandStatus(catEls.rStatus.textContent + tr('seq.skippedSuffix', { n: fails }));
               return true;
             }
             logSkipError(res); /* debug only: one line per skipped song, with its failure reason */
@@ -6496,11 +7244,11 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           if (sb) sb.click(); /* stops the engine — a looped previous song must not keep playing — and parks via __mdxStopModes */
           seqStopRequested = false; /* that click was ours, not a request during a load */
           let msg;
-          if (fails >= 10) msg = '読み込めない曲が続いたため、元の位置に戻って停止しました。';
-          else if (step < 0) msg = '読み込める曲が前にないため、元の位置に戻って停止しました。';
-          else msg = 'フォルダ内の曲をすべて再生しました。元の位置に戻って停止しました。';
-          if (fails > 0) msg += '（読み込めない ' + fails + ' 曲を飛ばしました）';
-          msg += takeSafetyNote('次の曲へ進もうとしました');
+          if (fails >= 10) msg = tr('seq.stopTooManyFail');
+          else if (step < 0) msg = tr('seq.stopNoneBefore');
+          else msg = tr('seq.stopAllPlayed');
+          if (fails > 0) msg += tr('seq.skippedSuffix', { n: fails });
+          msg += takeSafetyNote('safety.verbTried');
           setRandStatus(msg);
           return false;
         } finally { seqBusy = false; drainPendingStart(); }
@@ -6526,7 +7274,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (seqIndex >= folderSongs.length - 1) {
           const sb = $('btnStop');
           if (sb) sb.click(); /* stops the engine and parks via __mdxStopModes */
-          setRandStatus('フォルダ内の最後の曲が終わりました。' + takeSafetyNote('ここで止めました'));
+          setRandStatus(tr('seq.lastEnded') + takeSafetyNote('safety.verbStopped'));
           return false;
         }
         playSeqAt(seqIndex + 1);
@@ -6558,12 +7306,12 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         catEls.info.hidden = false;
         catEls.rTitle.textContent = entry.title || entry.filename;
         catEls.rMeta.textContent = 'メーカー: ' + (entry.maker || '—') + ' ／ ゲーム: ' + (entry.game || '—') + ' ／ パス: ' + entry.relpath;
-        setRandStatus('読み込み中…');
+        setRandStatus(tr('status.loading'));
         const mdxEnt = findFile(entry.relpath);
         if (!mdxEnt) { setRandStatus('MDX ファイルが選択フォルダ内に見つかりません: ' + entry.relpath); return false; }
         let mdxBytes;
         try { mdxBytes = await readEntryBytes(mdxEnt); }
-        catch (e) { setRandStatus('MDX の読み込みに失敗しました: ' + e.message); return false; }
+        catch (e) { setRandStatus(tr('status.mdxFail', { msg: e.message })); return false; }
         let pdxOverride = null;
         if (entry.pdx_ref) {
           const pdxEnt = findPdx(entry);
@@ -6583,13 +7331,13 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           const k = normKey(entry.relpath);
           seqAdopt(folderSongs.find((s) => s.key === k || s.key.endsWith('/' + k)) || null);
         }
-        const modeNote = contMode ? '（連続ランダム再生中）' : (seqActive ? '（フォルダ順次再生中）' : '');
+        const modeNote = contMode ? tr('modeNote.random') : (seqActive ? tr('modeNote.seq') : '');
         if (entry.pdx_ref && !pdxOverride) {
           setRandStatus('再生中: ' + entry.filename + '（参照 PDX「' + entry.pdx_ref + '」がフォルダ内に見つからず、FM のみ再生）' + modeNote);
         } else {
           setRandStatus('再生中: ' + entry.filename + modeNote);
         }
-        const sn = takeSafetyNote('次の曲へ進みました');
+        const sn = takeSafetyNote('safety.verbAdvanced');
         if (sn) setRandStatus(catEls.rStatus.textContent + sn);
         return true;
       }
@@ -6609,18 +7357,18 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
       async function playFolderEntry(pick) {
         const genAtStart = folderGen; /* v62: snapshot — a clear during the reads below aborts before loadSong */
         catEls.info.hidden = false;
-        setRandStatus('読み込み中…');
+        setRandStatus(tr('status.loading'));
         let mdxBytes;
         try { mdxBytes = await readEntryBytes(pick.ent); }
         catch (e) {
-          setRandStatus('MDX の読み込みに失敗しました: ' + e.message);
+          setRandStatus(tr('status.mdxFail', { msg: e.message }));
           return { ok: false, kind: 'read', message: e.message, path: pick.path, name: pick.name };
         }
         let parseBytes = mdxBytes;
         if (typeof isLzxBytes === 'function' && isLzxBytes(parseBytes)) {
           try { parseBytes = maybeExpandLzx(parseBytes); }
           catch (e) {
-            setRandStatus('LZX の展開に失敗しました: ' + e.message);
+            setRandStatus(tr('status.lzxExpandFail', { msg: e.message }));
             return { ok: false, kind: 'lzx', message: e.message, path: pick.path, name: pick.name };
           }
         }
@@ -6639,18 +7387,18 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
            * in a row) then applies to unparseable songs exactly as
            * to unreadable ones, and no half-updated display is left
            * pointing at a song that is not playing. */
-          setRandStatus('MDX の解析に失敗しました: ' + e.message);
+          setRandStatus(tr('status.mdxParseFail', { msg: e.message }));
           return { ok: false, kind: 'parse', message: e.message, path: pick.path, name: pick.name };
         }
         catEls.rTitle.textContent = title || pick.name;
-        catEls.rMeta.textContent = 'パス: ' + pick.path;
+        catEls.rMeta.textContent = tr('rand.pathLabel', { path: pick.path });
         let pdxOverride = null;
         if (pdxRef) {
           const pdxEnt = findPdx({ relpath: pick.path, pdx_ref: pdxRef });
           if (pdxEnt) {
             try {
               const pdxBytes = await readEntryBytes(pdxEnt);
-              pdxOverride = { bytes: pdxBytes, label: (pdxEnt.name || (pdxRef + '.PDX')) + '（フォルダ連携）', mismatch: false };
+              pdxOverride = { bytes: pdxBytes, label: tr('pdx.folderLinked', { name: (pdxEnt.name || (pdxRef + '.PDX')) }), mismatch: false };
             } catch (e) { /* PDX が読めなければ FM のみで続行 */ }
           }
         }
@@ -6664,13 +7412,13 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         await loadSong(mdxBytes, pick.path, 'folder', true, pdxOverride);
         if (genAtStart !== folderGen) return { ok: false, kind: 'aborted', message: '', path: pick.path, name: pick.name }; /* cleared inside loadSong's own awaits: do not mark or announce a song the clear unloaded */
         folderSongCurrent = true;
-        const modeNote = contMode ? '（連続ランダム再生中）' : (seqActive ? '（フォルダ順次再生中）' : '');
+        const modeNote = contMode ? tr('modeNote.random') : (seqActive ? tr('modeNote.seq') : '');
         if (pdxRef && !pdxOverride) {
-          setRandStatus('再生中: ' + pick.name + '（参照 PDX「' + pdxRef + '」がフォルダ内に見つからず、FM のみ再生）' + modeNote);
+          setRandStatus(tr('status.playingPdxMissing', { name: pick.name, pdx: pdxRef, modeNote }));
         } else {
-          setRandStatus('再生中: ' + pick.name + modeNote);
+          setRandStatus(tr('status.playing', { name: pick.name }) + modeNote);
         }
-        const sn = takeSafetyNote('次の曲へ進みました');
+        const sn = takeSafetyNote('safety.verbAdvanced');
         if (sn) setRandStatus(catEls.rStatus.textContent + sn);
         return { ok: true };
       }
@@ -6718,7 +7466,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
             if (!contMode) return; /* cancelled while picking */
           }
           setContMode(false);
-          setRandStatus('フォルダ内に見つからない曲が続いたため、連続ランダム再生を終了しました。' + takeSafetyNote('次の曲へ進もうとしました'));
+          setRandStatus('フォルダ内に見つからない曲が続いたため、連続ランダム再生を終了しました。' + takeSafetyNote('safety.verbTried'));
         } finally { contBusy = false; drainPendingStart(); }
       }
       async function playRandomOnce() {
@@ -6940,8 +7688,8 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         if (catEls.skipLog) { while (catEls.skipLog.firstChild) catEls.skipLog.removeChild(catEls.skipLog.firstChild); }
         if (catEls.skipLogWrap) catEls.skipLogWrap.hidden = true;
         updateSeqUi(); updateAdvanceFlag();
-        catEls.rootStatus.textContent = '選択をクリアしました。フォルダ未選択（順次再生にはフォルダ選択、ドラッグ＆ドロップ、またはファイルの複数選択が必要です）';
-        setRandStatus(hadSelection || ownsSong ? '選択をクリアしました。' : '選択をクリアしました（選択済みのフォルダはありませんでした）。');
+        catEls.rootStatus.textContent = tr('folder.clearedStatus');
+        setRandStatus(hadSelection || ownsSong ? tr('folder.cleared') : tr('folder.clearedNone'));
       }
       if (catEls.rootClear) catEls.rootClear.addEventListener('click', clearFolderSelection);
 
