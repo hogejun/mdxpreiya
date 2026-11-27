@@ -769,13 +769,13 @@
       </section>
 
       <!-- ===================== library ===================== -->
-      <section class="panel" aria-label="動作確認">
-        <h2>動作確認</h2>
+      <section class="panel" aria-label="動作確認" data-i18n-aria="aria.test" data-i18n-force>
+        <h2><span data-i18n="test.heading" data-i18n-force>動作確認</span></h2>
         <div class="songs" id="songList"></div>
         <div class="songs" id="songList2"></div>
         <div class="songs" style="margin-top:8px">
           <button class="song" id="btnTest" type="button">
-            <span class="fn">TEST</span><span class="tt">合成テスト曲（動作確認用・ドレミファソラシド）</span>
+            <span class="fn">TEST</span><span class="tt" data-i18n="lib.testSong" data-i18n-force>合成テスト曲（動作確認用・ドレミファソラシド）</span>
           </button>
         </div>
       </section>
@@ -856,7 +856,7 @@
         <p data-i18n-html="about.4"><b>MSM6258</b> — X68000 内蔵の ADPCM 音源。4bit ADPCM サンプルを PDX ファイルから読み、ドラムや効果音を 1 チャンネル（PCM8 モードでは多重再生）で鳴らす。X68000 ではクロック 4 MHz、サンプリング周波数は 3.9k〜15.6kHz。</p>
       </section>
 
-      <footer>FM コア: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka)、BSD-3-Clause</footer>
+      <footer data-i18n="footer.attribution" data-i18n-force>FM コア: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka)、BSD-3-Clause</footer>
     </main>
 
     <!-- Embedded song data (base64). SHA-256 of each decoded file is
@@ -3227,6 +3227,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "aria.closeup": "ソロ・クローズアップ",
     "aria.cuClose": "クローズアップを閉じる",
     "aria.library": "収録曲",
+    "aria.test": "動作確認",
     "aria.fileLoad": "ファイル読み込み",
     "aria.folderPanel": "フォルダと順次再生",
     "aria.notes": "注記",
@@ -3357,6 +3358,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "status.playingPdxMissing": "再生中: {name}（参照 PDX「{pdx}」がフォルダ内に見つからず、FM のみ再生）{modeNote}",
     "engine.ymfmFail": "ymfm (libymfm.wasm) の初期化に失敗しました",
     "test.name": "TEST (合成)",
+    "test.heading": "動作確認",
     "modeNote.random": "（連続ランダム再生中）",
     "modeNote.seq": "（フォルダ順次再生中）",
     "safety.limitLabel": "{v}分",
@@ -3404,6 +3406,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "calib.postRms": "較正後 RMS",
     "calib.refPeak": "参照 ピーク",
     "calib.postPeak": "較正後 ピーク",
+    "footer.attribution": "FM コア: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka)、BSD-3-Clause"
   },
   "en": {
     "doc.title": "MDX Player",
@@ -3416,6 +3419,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "aria.closeup": "Solo close-up",
     "aria.cuClose": "Close the close-up",
     "aria.library": "Included songs",
+    "aria.test": "Verification",
     "aria.fileLoad": "File loading",
     "aria.folderPanel": "Folder and sequential playback",
     "aria.notes": "Notes",
@@ -3546,6 +3550,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "status.playingPdxMissing": "Playing: {name} (referenced PDX “{pdx}” not found in the folder; FM only){modeNote}",
     "engine.ymfmFail": "ymfm (libymfm.wasm) failed to initialize",
     "test.name": "TEST (synthetic)",
+    "test.heading": "Verification",
     "modeNote.random": " (continuous random playback)",
     "modeNote.seq": " (folder sequential playback)",
     "safety.limitLabel": "{v} min",
@@ -3593,6 +3598,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "calib.postRms": "Post-cal. RMS",
     "calib.refPeak": "Ref. peak",
     "calib.postPeak": "Post-cal. peak",
+    "footer.attribution": "FM core: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka), BSD-3-Clause"
   },
   "sv": {
     "doc.title": "MDX-spelare",
@@ -3605,6 +3611,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "aria.closeup": "Solo-närbild",
     "aria.cuClose": "Stäng närbilden",
     "aria.library": "Medföljande låtar",
+    "aria.test": "Verifiering",
     "aria.fileLoad": "Filinläsning",
     "aria.folderPanel": "Mapp och sekventiell uppspelning",
     "aria.notes": "Noter",
@@ -3627,7 +3634,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "btn.nextSong": "Nästa låt",
     "btn.close": "Stäng",
     "btn.closeX": "× Stäng",
-    "btn.tempoReset": "Tillbaka till 100 %",
+    "btn.tempoReset": "Återställ 100 %",
     "label.volume": "Huvudvolym",
     "label.tempo": "Tempo",
     "spec.heading": "Spektrum",
@@ -3735,6 +3742,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "status.playingPdxMissing": "Spelar: {name} (refererad PDX ”{pdx}” hittades inte i mappen; endast FM){modeNote}",
     "engine.ymfmFail": "ymfm (libymfm.wasm) kunde inte initieras",
     "test.name": "TEST (syntetisk)",
+    "test.heading": "Verifiering",
     "modeNote.random": " (kontinuerlig slumpmässig uppspelning)",
     "modeNote.seq": " (sekventiell mappuppspelning)",
     "safety.limitLabel": "{v} min",
@@ -3782,6 +3790,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "calib.postRms": "RMS efter kal.",
     "calib.refPeak": "Ref. topp",
     "calib.postPeak": "Topp efter kal.",
+    "footer.attribution": "FM-kärna: ymfm (Aaron Giles) / libymfm.wasm (Hiromasa Tanaka), BSD-3-Clause"
   }
 };
       const I18N_LOCALES = { ja: 'ja-JP', en: 'en-US', sv: 'sv-SE' };
@@ -3918,6 +3927,32 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
       }
       function setStatus(msg) { els.status.textContent = msg || ''; }
+      /* Fill an element with a catalog message, wrapping the values
+       * named in jaKeys in <span lang="ja">: those values are song
+       * data (file names / relative paths — Japanese text), not UI
+       * text, so their glyphs must follow Japanese forms even when
+       * the UI language is en/sv. The visible text is exactly
+       * tr(key, params); only the lang markup is added. */
+      function fillI18n(el, key, params, jaKeys) {
+        const parts = tr(key).split(/\{([a-zA-Z]+)\}/);
+        el.textContent = '';
+        for (let i = 0; i < parts.length; i++) {
+          if (i % 2 === 0) {
+            if (parts[i]) el.appendChild(document.createTextNode(parts[i]));
+          } else {
+            const v = params && params[parts[i]] != null ? String(params[parts[i]]) : '{' + parts[i] + '}';
+            if (jaKeys.indexOf(parts[i]) >= 0) {
+              const sp = document.createElement('span');
+              sp.setAttribute('lang', 'ja');
+              sp.textContent = v;
+              el.appendChild(sp);
+            } else if (v) {
+              el.appendChild(document.createTextNode(v));
+            }
+          }
+        }
+      }
+      function setStatusPlaying(name) { fillI18n(els.status, 'status.playing', { name: name }, ['name']); }
 
       /* ---------------- song / PDX pool state ---------------- */
       let cur = {
@@ -4052,15 +4087,12 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           els.warn.className = 'warnline'; els.warn.textContent = '';
           return;
         }
-        let meta;
         if (cur.pdxName) {
-          meta = cur.pdxBytes
-            ? tr('meta.withPdxLoaded', { name: cur.name, pdx: cur.pdxName, label: cur.pdxLabel })
-            : tr('meta.withPdx', { name: cur.name, pdx: cur.pdxName });
+          if (cur.pdxBytes) fillI18n(els.meta, 'meta.withPdxLoaded', { name: cur.name, pdx: cur.pdxName, label: cur.pdxLabel }, ['name']);
+          else fillI18n(els.meta, 'meta.withPdx', { name: cur.name, pdx: cur.pdxName }, ['name']);
         } else {
-          meta = tr('meta.noPdx', { name: cur.name });
+          fillI18n(els.meta, 'meta.noPdx', { name: cur.name }, ['name']);
         }
-        els.meta.textContent = meta;
         if (cur.pdxName && !cur.pdxBytes) {
           els.warn.textContent = tr('warn.pdxMissing', { pdx: cur.pdxName });
           els.warn.className = 'warnline show';
@@ -5792,7 +5824,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
           try {
             const p = actx.resume();
             if (p && p.then) p.then(() => {
-              if (actx && actx.state === 'running' && isPlaying && cur.name) setStatus(tr('status.playing', { name: cur.name }));
+              if (actx && actx.state === 'running' && isPlaying && cur.name) setStatusPlaying(cur.name);
             }, () => {});
           } catch (e) { /* ignore */ }
         }
@@ -6082,7 +6114,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const installedCur = cur; /* identity check for the generation bail below (v63) */
         describeSong();
         resetProgress(); /* the progress bar restarts empty for the new song, until its first state report */
-        if (lzxExpanded) els.meta.textContent += tr('meta.lzxSuffix');
+        if (lzxExpanded) els.meta.appendChild(document.createTextNode(tr('meta.lzxSuffix')));
         document.querySelectorAll('.song').forEach(el => el.classList.toggle('playing', el.dataset && el.dataset.file === name));
         /* A committed load supersedes any pause/stop suspend that
          * is still pending: the new song's own state reports (and
@@ -6115,7 +6147,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         sendCmd('volume', els.vol.value / 100);
         sendCmd('tempo', els.tempoRate.value / 100);
         sendCmd('loop', loopOn);
-        if (autoplay) { sendCmd('play'); reflectPlay(true); setStatus(tr('status.playing', { name })); }
+        if (autoplay) { sendCmd('play'); reflectPlay(true); setStatusPlaying(name); }
         else setStatus(tr('status.loaded', { name }));
         if (actx && actx.state !== 'running') setStatus(tr('status.audioBlocked'));
       }
@@ -6188,7 +6220,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
         const be = await ensureAudio(); if (!be) return;
         sendMuteSolo();
         if (isPlaying) { sendCmd('pause'); reflectPlay(false); setStatus(tr('status.paused')); armSuspendPending(); }
-        else { cancelSuspendPending(); sendCmd('play'); reflectPlay(true); setStatus(tr('status.playing', { name: cur.name })); if (window.__mdxSeqResume) window.__mdxSeqResume(); }
+        else { cancelSuspendPending(); sendCmd('play'); reflectPlay(true); setStatusPlaying(cur.name); if (window.__mdxSeqResume) window.__mdxSeqResume(); }
       });
       els.stop.addEventListener('click', async () => {
         /* Folder sequential mode is only parked by stop (position
