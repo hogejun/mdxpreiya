@@ -561,6 +561,42 @@
         .console-detail > .panel { margin-bottom: 10px; }
         .detail-empty { min-height: 0; margin-bottom: 10px; }
         .console > .panel:last-child, .console-detail > .panel:last-child { margin-bottom: 0; }
+        /* --- v76 phone-width fit: channel rows + tempo row ---
+         * Channel rows overflowed the 390px viewport while playing
+         * (content 400-419px across ja/en/sv): the level-meter
+         * track was a plain 1fr, i.e. minmax(auto, 1fr), so it
+         * could not shrink below its content floor, and the fixed
+         * columns (name 52px + LED 12px + gaps 8px + M/S buttons
+         * 36px each) plus the voice/pan readout (@n widens from
+         * "@—" to "@255" during playback) pushed the S button off
+         * screen. Phone widths only: let the meter track shrink
+         * to zero, tighten the fixed columns and gaps, and shrink
+         * the readout / M/S buttons so every element, S included,
+         * stays inside the row. Desktop (>=761px) is untouched. */
+        .chlist { min-width: 0; }
+        .chrow { grid-template-columns: 46px 10px minmax(0, 1fr) auto auto; gap: 4px 5px; min-width: 0; }
+        .chrow .barwrap, .chrow .chkb { min-width: 0; }
+        .chrow .nodata { overflow: hidden; text-overflow: ellipsis; }
+        .vp { gap: 4px; font-size: 0.72rem; }
+        .vp button.vnum { padding: 0 1px; }
+        .panpot { width: 14px; height: 14px; margin-right: 3px; }
+        .panpot .pneedle { height: 5.5px; }
+        .msbtns { gap: 3px; }
+        .msbtn { min-width: 28px; }
+        /* Tempo row: the reset button was a shrinkable flex item,
+         * so the row squeezed it to 67-72px and its label wrapped
+         * to three lines (only 31-36px of text width inside 18px
+         * side padding). Phone widths only: the button keeps its
+         * natural one-line width (flex-shrink 0, nowrap, side
+         * padding 18px -> 8px) and the slider yields instead
+         * (min-width 0 lets it shrink below its intrinsic size).
+         * Estimated at 390px (330px of row width): ja label 27 +
+         * value 50 + button ~98 + gaps 30 = ~205, leaving ~125px
+         * for the slider; en ~226 total / ~104px slider; sv ~246
+         * total / ~84px slider — all fit on one line, so the
+         * button stays in the row (no second-line fallback). */
+        #tempoRate { min-width: 0; }
+        #btnTempoReset { flex: 0 0 auto; white-space: nowrap; padding-left: 8px; padding-right: 8px; }
       }
       /* Lower library list: file-selector flavour (v28) */
       .songs { gap: 5px; }
@@ -3634,7 +3670,7 @@ registerProcessor('mdx-player', MdxWorkletProcessor);
     "btn.nextSong": "Nästa låt",
     "btn.close": "Stäng",
     "btn.closeX": "× Stäng",
-    "btn.tempoReset": "Återställ 100 %",
+    "btn.tempoReset": "Återställ 100 %",
     "label.volume": "Huvudvolym",
     "label.tempo": "Tempo",
     "spec.heading": "Spektrum",
